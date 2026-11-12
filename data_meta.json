@@ -1,0 +1,268 @@
+{
+ "sources": [
+  {
+   "bureau": "kanto_shinetsu",
+   "domain": "医科",
+   "snapshot_id": "kanto_shinetsu/2026-10-31T182513",
+   "retrieved_on": "2026-10-31",
+   "datasets": [
+    {
+     "dataset_type": "medical_facilities",
+     "as_of_date": "2026-09-01",
+     "carried": false
+    },
+    {
+     "dataset_type": "medical_itemized",
+     "as_of_date": "2026-09-01",
+     "carried": false
+    }
+   ],
+   "last_confirmed_on": "2026-11-10"
+  },
+  {
+   "bureau": "kanto_shinetsu",
+   "domain": "薬局",
+   "snapshot_id": "kanto_shinetsu/2026-10-31T182513",
+   "retrieved_on": "2026-10-31",
+   "datasets": [
+    {
+     "dataset_type": "pharmacy_facilities",
+     "as_of_date": "2026-09-01",
+     "carried": false
+    }
+   ],
+   "last_confirmed_on": "2026-11-10"
+  },
+  {
+   "bureau": "hokkaido",
+   "domain": "医科",
+   "snapshot_id": "hokkaido/2026-11-10T135317",
+   "retrieved_on": "2026-11-10",
+   "datasets": [
+    {
+     "dataset_type": "medical_facilities",
+     "as_of_date": "2026-11-01",
+     "carried": false
+    },
+    {
+     "dataset_type": "medical_itemized",
+     "as_of_date": "2026-11-01",
+     "carried": false
+    }
+   ],
+   "last_confirmed_on": "2026-11-11"
+  },
+  {
+   "bureau": "hokkaido",
+   "domain": "薬局",
+   "snapshot_id": "hokkaido/2026-11-10T135317",
+   "retrieved_on": "2026-11-10",
+   "datasets": [
+    {
+     "dataset_type": "pharmacy_facilities",
+     "as_of_date": "2026-11-01",
+     "carried": false
+    }
+   ],
+   "last_confirmed_on": "2026-11-11"
+  },
+  {
+   "bureau": "tohoku",
+   "domain": "医科",
+   "snapshot_id": "tohoku/2026-10-31T182735",
+   "retrieved_on": "2026-10-31",
+   "datasets": [
+    {
+     "dataset_type": "medical_facilities",
+     "as_of_date": "2026-09-01",
+     "carried": false
+    },
+    {
+     "dataset_type": "medical_itemized",
+     "as_of_date": "2026-09-01",
+     "carried": false
+    }
+   ],
+   "last_confirmed_on": "2026-11-11"
+  },
+  {
+   "bureau": "tohoku",
+   "domain": "薬局",
+   "snapshot_id": "tohoku/2026-10-31T182735",
+   "retrieved_on": "2026-10-31",
+   "datasets": [
+    {
+     "dataset_type": "pharmacy_facilities",
+     "as_of_date": "2026-09-01",
+     "carried": false
+    }
+   ],
+   "last_confirmed_on": "2026-11-11"
+  },
+  {
+   "bureau": "tokaihokuriku",
+   "domain": "医科",
+   "snapshot_id": "tokaihokuriku/2026-11-09T140633",
+   "retrieved_on": "2026-11-09",
+   "datasets": [
+    {
+     "dataset_type": "medical_facilities",
+     "as_of_date": "2026-11-01",
+     "carried": false
+    },
+    {
+     "dataset_type": "medical_itemized",
+     "as_of_date": "2026-09-01",
+     "carried": true
+    }
+   ],
+   "last_confirmed_on": "2026-11-11"
+  },
+  {
+   "bureau": "tokaihokuriku",
+   "domain": "薬局",
+   "snapshot_id": "tokaihokuriku/2026-11-09T140633",
+   "retrieved_on": "2026-11-09",
+   "datasets": [
+    {
+     "dataset_type": "pharmacy_facilities",
+     "as_of_date": "2026-11-01",
+     "carried": false
+    }
+   ],
+   "last_confirmed_on": "2026-11-11"
+  },
+  {
+   "bureau": "kinki",
+   "domain": "医科",
+   "snapshot_id": "kinki/2026-11-09T140611",
+   "retrieved_on": "2026-11-09",
+   "datasets": [
+    {
+     "dataset_type": "medical_facilities",
+     "as_of_date": "2026-11-01",
+     "carried": false
+    },
+    {
+     "dataset_type": "medical_itemized",
+     "as_of_date": "2026-11-01",
+     "carried": false
+    }
+   ],
+   "last_confirmed_on": "2026-11-11"
+  },
+  {
+   "bureau": "kinki",
+   "domain": "薬局",
+   "snapshot_id": "kinki/2026-11-09T140611",
+   "retrieved_on": "2026-11-09",
+   "datasets": [
+    {
+     "dataset_type": "pharmacy_facilities",
+     "as_of_date": "2026-11-01",
+     "carried": false
+    }
+   ],
+   "last_confirmed_on": "2026-11-11"
+  },
+  {
+   "bureau": "chugokushikoku",
+   "domain": "医科",
+   "snapshot_id": "chugokushikoku/2026-11-11T100246",
+   "retrieved_on": "2026-11-11",
+   "datasets": [
+    {
+     "dataset_type": "medical_facilities",
+     "as_of_date": "2026-10-01",
+     "carried": false
+    },
+    {
+     "dataset_type": "medical_itemized",
+     "as_of_date": "2026-10-01",
+     "carried": true
+    }
+   ],
+   "last_confirmed_on": "2026-11-10"
+  },
+  {
+   "bureau": "chugokushikoku",
+   "domain": "薬局",
+   "snapshot_id": "chugokushikoku/2026-11-11T100246",
+   "retrieved_on": "2026-11-11",
+   "datasets": [
+    {
+     "dataset_type": "pharmacy_facilities",
+     "as_of_date": "2026-10-01",
+     "carried": false
+    }
+   ],
+   "last_confirmed_on": "2026-11-10"
+  },
+  {
+   "bureau": "shikoku",
+   "domain": "医科",
+   "snapshot_id": "shikoku/2026-11-09T140758",
+   "retrieved_on": "2026-11-09",
+   "datasets": [
+    {
+     "dataset_type": "medical_facilities",
+     "as_of_date": "2026-11-01",
+     "carried": false
+    },
+    {
+     "dataset_type": "medical_itemized",
+     "as_of_date": "2026-11-01",
+     "carried": false
+    }
+   ],
+   "last_confirmed_on": "2026-11-11"
+  },
+  {
+   "bureau": "shikoku",
+   "domain": "薬局",
+   "snapshot_id": "shikoku/2026-11-09T140758",
+   "retrieved_on": "2026-11-09",
+   "datasets": [
+    {
+     "dataset_type": "pharmacy_facilities",
+     "as_of_date": "2026-11-01",
+     "carried": false
+    }
+   ],
+   "last_confirmed_on": "2026-11-11"
+  },
+  {
+   "bureau": "kyushu",
+   "domain": "医科",
+   "snapshot_id": "kyushu/2026-10-31T182622",
+   "retrieved_on": "2026-10-31",
+   "datasets": [
+    {
+     "dataset_type": "medical_facilities",
+     "as_of_date": "2026-10-01",
+     "carried": true
+    },
+    {
+     "dataset_type": "medical_itemized",
+     "as_of_date": "2026-10-01",
+     "carried": false
+    }
+   ],
+   "last_confirmed_on": "2026-11-11"
+  },
+  {
+   "bureau": "kyushu",
+   "domain": "薬局",
+   "snapshot_id": "kyushu/2026-10-31T182622",
+   "retrieved_on": "2026-10-31",
+   "datasets": [
+    {
+     "dataset_type": "pharmacy_facilities",
+     "as_of_date": "2026-10-01",
+     "carried": true
+    }
+   ],
+   "last_confirmed_on": "2026-11-11"
+  }
+ ]
+}
