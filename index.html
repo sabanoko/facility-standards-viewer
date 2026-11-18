@@ -1,0 +1,2435 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>施設基準届出データベース(試験公開)</title>
+<link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  body {
+    font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: #f5f5f5;
+    color: #222;
+  }
+  h1 {
+    font-size: 18px;
+    margin: 0 0 4px 0;
+  }
+  .subtitle {
+    color: #666;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  #status {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 12px;
+    white-space: pre-wrap;
+  }
+  #search-box {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+  #search-box:disabled {
+    background: #eee;
+  }
+  .layout {
+    display: flex;
+    gap: 16px;
+    align-items: stretch;
+    height: 88vh;
+    min-height: 820px;
+  }
+  #results-panel {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    flex: 0 0 340px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /* 中央列(施設詳細)・右列(地図)は3列横並びのうち残りの幅を
+     2:3で分け合う。中央列は結果として旧#right-column全体の幅の
+     概ね半分程度に狭まり、地図パネルは中央列より広くなる。 */
+  #detail-panel {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    flex: 2 1 0;
+    min-width: 0;
+    overflow-y: auto;
+  }
+  #results-count {
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #666;
+    border-bottom: 1px solid #eee;
+  }
+  #results-pager {
+    padding: 6px 12px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid #eee;
+  }
+  #results-pager[hidden] {
+    display: none;
+  }
+  #results-pager button {
+    padding: 3px 10px;
+    font-size: 12px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background: #fff;
+    cursor: pointer;
+  }
+  #results-pager button:disabled {
+    color: #bbb;
+    cursor: default;
+  }
+  #map-panel {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8px;
+    flex: 3 1 0;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  #map-panel[hidden] {
+    display: none;
+  }
+  #map-panel-header {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 6px;
+    flex: 0 0 auto;
+  }
+  #map-legend {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: #444;
+    margin-bottom: 6px;
+    flex: 0 0 auto;
+  }
+  #map-legend .map-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  #map-legend .map-legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  #map-overlap-note {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 6px;
+    flex: 0 0 auto;
+  }
+  #map {
+    width: 100%;
+    flex: 1;
+    min-height: 360px;
+    border-radius: 3px;
+  }
+  .maplibregl-popup-content {
+    font-size: 13px;
+  }
+  .marker-selected svg {
+    filter: drop-shadow(0 0 3px #1a73e8) drop-shadow(0 0 6px #1a73e8);
+  }
+  .marker-selected {
+    z-index: 10;
+  }
+  #results-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  #results-list li {
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+  }
+  #results-list li:hover {
+    background: #f0f7ff;
+  }
+  #results-list li.selected {
+    background: #e0efff;
+  }
+  .facility-name {
+    font-weight: bold;
+    font-size: 14px;
+  }
+  .facility-bureau {
+    display: inline-block;
+    font-size: 11px;
+    color: #05529c;
+    background: #e6f1fb;
+    border-radius: 3px;
+    padding: 1px 6px;
+    margin-top: 3px;
+    margin-right: 4px;
+  }
+  .facility-domain {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 3px;
+    padding: 1px 6px;
+    margin-top: 3px;
+    margin-right: 4px;
+  }
+  .facility-domain.domain-medical {
+    color: #0a6e31;
+    background: #e5f6ea;
+  }
+  .facility-domain.domain-pharmacy {
+    color: #7a3b96;
+    background: #f3e8fa;
+  }
+  .facility-address {
+    font-size: 12px;
+    color: #666;
+    margin-top: 2px;
+  }
+  #detail-panel {
+    padding: 16px;
+  }
+  #detail-empty {
+    color: #999;
+    font-size: 13px;
+  }
+  #detail-name {
+    font-size: 16px;
+    font-weight: bold;
+    margin: 0 0 4px 0;
+  }
+  #asof-summary {
+    font-size: 12px;
+    color: #444;
+    margin: -6px 0 12px 0;
+    line-height: 1.6;
+  }
+  #asof-summary .asof-lag, #notice .asof-lag, #detail-asof .asof-lag {
+    background: #fff1d6;
+    color: #7a4300;
+    padding: 0 3px;
+    border-radius: 2px;
+  }
+  #detail-beds {
+    font-size: 12px;
+    color: #333;
+    margin: 0 0 4px 0;
+  }
+  #detail-beds .beds-note {
+    color: #777;
+  }
+  #detail-asof {
+    font-size: 12px;
+    color: #444;
+    margin: 0 0 4px 0;
+  }
+  #detail-bureau {
+    font-size: 12px;
+    color: #05529c;
+    margin-bottom: 4px;
+  }
+  #detail-address {
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 12px;
+  }
+  #detail-filings {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  #detail-filings li {
+    padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+  }
+  .category-tag-subtle {
+    color: #888;
+    font-size: 12px;
+    margin-left: 4px;
+  }
+  .category-tag-itemized-only {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: bold;
+    color: #a34a00;
+    background: #fff1e0;
+    border: 1px solid #f2c894;
+    border-radius: 3px;
+    padding: 1px 6px;
+    margin-left: 6px;
+  }
+  .filing-beds {
+    display: inline-block;
+    font-size: 12px;
+    color: #234;
+    margin-left: 8px;
+  }
+  .filing-beds-other {
+    display: block;
+    font-size: 11px;
+    color: #555;
+    margin-top: 2px;
+  }
+  .filing-beds-flag {
+    display: inline-block;
+    font-size: 11px;
+    color: #8a5a00;
+    background: #fff8e1;
+    border: 1px solid #ecd48a;
+    border-radius: 3px;
+    padding: 1px 6px;
+    margin-left: 6px;
+  }
+  li.itemized-only-row {
+    background: #fffaf3;
+  }
+  #detail-filing-count {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+  .tab-bar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+  .tab-button {
+    padding: 8px 16px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    background: #e8e8e8;
+    color: #555;
+    cursor: pointer;
+  }
+  .tab-button.active {
+    background: #fff;
+    color: #222;
+    font-weight: bold;
+  }
+  .tab-panel {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 0 4px 4px 4px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  #monthly-section { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
+  #monthly-section[hidden] { display: none; }
+  #monthly-note { font-size: 13px; color: #555; margin: 8px 0; }
+  #monthly-chart-wrap { overflow-x: auto; }
+  #monthly-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; margin: 6px 0; }
+  #monthly-legend .swatch { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 4px; }
+  #monthly-table { border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  #monthly-table th, #monthly-table td { border: 1px solid #ddd; padding: 4px 8px; text-align: right; }
+  #monthly-table th { background: #f3f3f3; }
+  #monthly-table td.monthly-missing { color: #999; text-align: center; }
+  #monthly-table td.monthly-itemized { background: #fff4e0; }
+  #monthly-table td.monthly-total-missing { color: #b00020; text-align: left; font-size: 12px; }
+  .tab-panel[hidden] {
+    display: none;
+  }
+  .filter-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .filter-row label {
+    font-size: 13px;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .filter-row select {
+    padding: 4px 6px;
+    font-size: 13px;
+  }
+  #filing-search-wrap, #monthly-search-wrap {
+    position: relative;
+    margin-bottom: 12px;
+  }
+  #filing-search-box, #monthly-search-box {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  #filing-search-box:disabled {
+    background: #eee;
+  }
+  #filing-candidates, #monthly-candidates {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    z-index: 10;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-top: none;
+    max-height: 240px;
+    overflow-y: auto;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  #filing-candidates:empty, #monthly-candidates:empty {
+    border: none;
+  }
+  #filing-candidates li, #monthly-candidates li {
+    padding: 8px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  #filing-candidates li:hover, #monthly-candidates li:hover {
+    background: #f0f7ff;
+  }
+  #selected-filing-name {
+    font-size: 13px;
+    color: #333;
+    margin-bottom: 4px;
+  }
+  #selected-filing-name strong {
+    font-size: 15px;
+  }
+  #notice {
+    margin-top: 24px;
+    padding: 14px 16px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #444;
+  }
+  #notice h2 { font-size: 14px; margin: 14px 0 4px 0; }
+  #notice h2:first-child { margin-top: 0; }
+  #notice ul { margin: 4px 0; padding-left: 20px; }
+  #notice table { border-collapse: collapse; width: 100%; margin: 6px 0; }
+  #notice th, #notice td { border: 1px solid #ddd; padding: 3px 6px; text-align: left; vertical-align: top; word-break: break-all; }
+  #notice th { background: #f5f5f5; font-weight: normal; }
+  #notice details { margin: 6px 0; }
+  #notice summary { cursor: pointer; color: #05529c; }
+  #notice .notice-meta-error { color: #a05a00; }
+  /* スマートフォンなど狭い画面: 3列を縦に積み、表は横にスクロールさせる */
+  @media (max-width: 800px) {
+    body { padding: 10px; }
+    .layout { flex-direction: column; height: auto; min-height: 0; }
+    #results-panel { flex: none; max-height: 60vh; }
+    #detail-panel { flex: none; max-height: none; }
+    #map-panel { flex: none; }
+    #map { min-height: 320px; }
+    .tab-bar { flex-wrap: wrap; }
+    .tab-button { padding: 8px 10px; font-size: 13px; }
+    table { display: block; overflow-x: auto; max-width: 100%; }
+    details { max-width: 100%; overflow-x: auto; }
+    #status, .subtitle, p, li { overflow-wrap: anywhere; }
+  }
+</style>
+</head>
+<body>
+
+<h1>施設基準届出データベース(試験公開)</h1>
+<p class="subtitle">
+  全国の保険医療機関・保険薬局について、施設基準の届出状況を検索できるサイトです。
+  全国8局の医科・薬局について検索できます。運営者の国際医療福祉大学 石田円研究室が各厚生局の公表データをもとに作成したもので、国(厚生労働省・各厚生局)が作成・公表したものではありません。
+  検索はブラウザ内で動くDuckDB-WasmでParquetファイルに直接SQLクエリを実行しています(サーバー側の検索処理なし)。
+  出典・加工の内容・免責事項は<a href="#notice">ページ下部</a>に記載しています。
+</p>
+
+<div id="status">DuckDB-Wasmを初期化中...</div>
+<div id="data-loading" hidden>データを読み込んでいます...</div>
+<div id="asof-summary" style="display:none;"></div>
+
+<div class="tab-bar">
+  <button type="button" class="tab-button active" id="tab-button-facility">施設名で検索</button>
+  <button type="button" class="tab-button" id="tab-button-filing">施設基準名で検索</button>
+  <button type="button" class="tab-button" id="tab-button-monthly">月ごとの変化</button>
+</div>
+
+<div class="tab-panel" id="tab-panel-facility">
+  <input type="text" id="search-box" placeholder="施設名の一部を入力(例: 病院、薬局名の一部)" disabled>
+</div>
+
+<div class="tab-panel" id="tab-panel-filing" hidden>
+  <div class="filter-row">
+    <label><input type="radio" name="filing-domain" value="医科" checked> 医科</label>
+    <label><input type="radio" name="filing-domain" value="薬局"> 薬局</label>
+    <label>局:
+      <select id="filing-bureau-select" disabled>
+        <option value="">(全局)</option>
+      </select>
+    </label>
+    <label>都道府県:
+      <select id="filing-prefecture-select" disabled>
+        <option value="">(全都道府県)</option>
+      </select>
+    </label>
+  </div>
+  <div id="filing-search-wrap">
+    <input type="text" id="filing-search-box" placeholder="施設基準名(届出名称)の一部を入力(例: 地域包括ケア病棟入院料)" disabled>
+    <ul id="filing-candidates"></ul>
+  </div>
+  <div id="selected-filing-name">届出名称を選択してください(候補一覧から選んでください)。</div>
+</div>
+
+<div class="tab-panel" id="tab-panel-monthly" hidden>
+  <div class="filter-row">
+    <label><input type="radio" name="monthly-domain" value="医科" checked> 医科</label>
+    <label><input type="radio" name="monthly-domain" value="薬局"> 薬局</label>
+    <label>都道府県:
+      <select id="monthly-prefecture-select" disabled>
+        <option value="">(全都道府県)</option>
+      </select>
+    </label>
+    <label><input type="radio" name="monthly-metric" value="facilities" checked> 施設数</label>
+    <label><input type="radio" name="monthly-metric" value="beds"> 届出の病床数</label>
+  </div>
+  <div id="monthly-search-wrap">
+    <input type="text" id="monthly-search-box" placeholder="施設基準名(届出名称)の一部を入力(例: 地域包括ケア病棟入院料)" disabled>
+    <ul id="monthly-candidates"></ul>
+  </div>
+  <div id="monthly-selected">届出名称を選択してください(候補一覧から選んでください)。</div>
+</div>
+
+<div id="monthly-section" hidden>
+  <p id="monthly-note">表示の月は、名簿に書かれた「現在日」(データ時点)の月です。当方がデータを取得した日ではありません。
+    月が抜けている局は、線をつながず、前後の月で補っていません。</p>
+  <div id="monthly-legend"></div>
+  <div id="monthly-chart-wrap"></div>
+  <div id="monthly-footnotes"></div>
+  <div id="monthly-related"></div>
+  <div id="monthly-table-wrap"></div>
+  <div id="monthly-current-total"></div>
+</div>
+
+<div class="layout">
+  <div id="results-panel">
+    <div id="results-count">&nbsp;</div>
+    <div id="results-pager" hidden>
+      <button type="button" id="pager-prev">← 前へ</button>
+      <span id="pager-label"></span>
+      <button type="button" id="pager-next">次へ →</button>
+    </div>
+    <ul id="results-list"></ul>
+  </div>
+  <div id="detail-panel">
+    <div id="detail-empty">左の一覧から施設を選ぶと、届出一覧がここに表示されます。</div>
+    <div id="detail-content" style="display:none;">
+      <p id="detail-name"></p>
+      <p id="detail-bureau"></p>
+      <p id="detail-asof"></p>
+      <p id="detail-beds"></p>
+      <p id="detail-address"></p>
+      <p id="detail-filing-count"></p>
+      <ul id="detail-filings"></ul>
+    </div>
+  </div>
+
+  <div id="map-panel" hidden>
+    <div id="map-panel-header">地図(検証用、東京都・医科/薬局のみ・選択施設の周辺約1.5km)</div>
+    <div id="map-legend">
+      <span class="map-legend-item"><span class="map-legend-dot" style="background:#d90429;"></span>選択中の施設</span>
+      <span class="map-legend-item"><span class="map-legend-dot" style="background:#0a6e31;"></span>医科</span>
+      <span class="map-legend-item"><span class="map-legend-dot" style="background:#7a3b96;"></span>薬局</span>
+    </div>
+    <div id="map-overlap-note">同じ建物・街区にある施設は、表示上ずらして示しています(実際の位置は同一地点付近です)。</div>
+    <div id="map"></div>
+  </div>
+</div>
+
+<section id="notice">
+  <h2>出典</h2>
+  <p>
+    出典：厚生労働省 各地方厚生局「施設基準の届出受理状況(届出受理医療機関名簿)」
+    (関東信越厚生局、北海道厚生局、東北厚生局、東海北陸厚生局、近畿厚生局、中国四国厚生局、四国厚生支局、九州厚生局)
+    (各ページのURLは下の出典一覧のとおり。データの現在日・取得日は「データの時点」の表のとおり)
+  </p>
+  <details>
+    <summary>出典一覧(局名・ページ名・URL)</summary>
+    <table id="source-table">
+      <thead><tr><th>局名</th><th>ページ名</th><th>URL</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p>各局の利用規約(公共データ利用規約〔第1.0版〕〔PDL1.0〕に準拠): <span id="terms-links"></span></p>
+  </details>
+
+  <h2>加工について</h2>
+  <p>
+    本サイトは、上記の各厚生局が公表する名簿(Excel)を、国際医療福祉大学 石田円研究室が加工して作成しています
+    (全国8局のデータの統合、検索用の形式への変換、届出名称の整理、住所からの位置の推定を含みます)。
+    「施設基準の届出受理状況(届出受理医療機関名簿)」(各地方厚生局。各ページのURLは上の出典一覧のとおり)をもとに国際医療福祉大学 石田円研究室作成。
+    加工・編集の内容は国際医療福祉大学 石田円研究室の責任によるものです。各厚生局の情報は
+    <a href="https://www.digital.go.jp/resources/open_data/public_data_license_v1.0" target="_blank" rel="noopener">公共データ利用規約(第1.0版)〔PDL1.0〕</a>に準拠した利用条件で利用しています。
+  </p>
+  <p>
+    <strong>ライセンス:</strong> 元データは各地方厚生局・国土交通省の公表データ(PDL1.0)です。
+    本サイトによる加工部分(データの整理・統合、住所からの座標の推定、集計)は
+    <a href="https://creativecommons.org/licenses/by/4.0/deed.ja" target="_blank" rel="noopener">CC BY 4.0</a>
+    (<a href="https://creativecommons.org/licenses/by/4.0/legalcode.ja" target="_blank" rel="noopener">本文</a>。
+    原文: https://creativecommons.org/licenses/by/4.0/)で提供します。表示: 国際医療福祉大学 石田円研究室。
+    元データの部分には、各出典の利用条件(PDL1.0)が引き続き適用されます。
+  </p>
+
+  <h2>地図・位置情報について</h2>
+  <p>
+    地図上の位置は、国土交通省「位置参照情報ダウンロードサービス」(街区レベル位置参照情報、第23.0a版、東京都)
+    (<a href="https://nlftp.mlit.go.jp/isj/" target="_blank" rel="noopener">https://nlftp.mlit.go.jp/isj/</a>)をもとに、
+    国際医療福祉大学 石田円研究室が住所から推定したものです。街区単位の精度で、建物の正確な位置ではありません。
+    同じ街区・建物の施設は、表示上少しずらして示しています(実際の位置は同一地点付近です)。
+    出典：位置参照情報ダウンロードサービス（国土交通省）(<a href="https://nlftp.mlit.go.jp/isj/index.html" target="_blank" rel="noopener">https://nlftp.mlit.go.jp/isj/index.html</a>)。
+    「位置参照情報ダウンロードサービス」（国土交通省）(<a href="https://nlftp.mlit.go.jp/isj/index.html" target="_blank" rel="noopener">https://nlftp.mlit.go.jp/isj/index.html</a>)をもとに国際医療福祉大学 石田円研究室作成
+    (住所から位置を推定する加工を行っています。国が作成したものではありません)。
+    国土交通省のサイトの利用規約は公共データ利用規約(第1.0版)〔PDL1.0〕です。
+    地図の背景: &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors
+    (データは<a href="https://opendatacommons.org/licenses/odbl/" target="_blank" rel="noopener">Open Database License(ODbL)</a>の下で提供されています)。
+  </p>
+
+  <h2>データの時点(現在日)と取得日</h2>
+  <p>
+    「現在日」は、各局が名簿の先頭に記載している「令和○年○月○日現在」(データ時点)です。
+    「取得日」は、当方が各局のページからデータを取得し、本サイトに取り込んだ日です。
+    名簿には「主名簿」(届出受理医療機関名簿の全体)と「項目別」(届出項目別の名簿)があり、
+    局によっては、公表元で項目別が主名簿より古いまま更新されていないことがあります。
+    その場合、本サイトは取得済みの最新の項目別を使うため、項目別の現在日が主名簿より古くなります(下の表で強調しています)。
+    最新・正確な時点は、各局の出典ページでご確認ください。
+  </p>
+  <div id="data-meta"><span class="notice-meta-error">データの時点を読み込み中...</span></div>
+
+  <h2>免責事項・ご注意</h2>
+  <ul>
+    <li>本サイトは、厚生労働省・各厚生局が作成・公表した名簿そのものではありません。内容の正確性・最新性を保証しません。</li>
+    <li>施設基準を届け出ていない医療機関・薬局(自由診療のみの施設等)は掲載されません。地域の医療機関を網羅したものではありません。</li>
+    <li>病床数は、名簿に記載された施設全体の値を種別(一般・療養・精神など)ごとに分けて表示したものです。許可病床数と一致するとは限りません。
+      届出ごとの病床数は、名簿の備考欄に書かれた値(病棟ごとの値は合計)で、書き方の揺れや重複記載の疑いがあるものには注記を付けています。</li>
+    <li>届出の内容は変更・取下げがあり得ます。受診や薬局の選択、診療報酬の算定の根拠とせず、必ず各局の出典ページ等でご確認ください。</li>
+    <li>
+      掲載内容の誤りの訂正、または掲載の削除を希望される方は、madoi(at)ihwg.jp までご連絡ください
+      ((at) を @ に置き換えてください)。
+      確認のうえ、すみやかに対応します。
+    </li>
+  </ul>
+  <p>運営者: 国際医療福祉大学 石田円研究室　連絡先: madoi(at)ihwg.jp ((at) を @ に置き換えてください)</p>
+  <p>本サイトは JSPS科研費 JP26K20460 の助成を受けて作成しています。</p>
+</section>
+
+<script type="module">
+import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/+esm";
+
+const MEDICAL_FACILITIES_URL = "national_medical_facilities.parquet";
+const MEDICAL_FILINGS_URL = "national_medical_filings.parquet";
+const MEDICAL_FILING_BEDS_URL = "national_medical_filing_beds.parquet";
+const MONTHLY_STATS_URL = "monthly_filing_stats.parquet";
+const FILING_NAME_RELATIONS_URL = "filing_name_relations.csv";
+const PHARMACY_FACILITIES_URL = "national_pharmacy_facilities.parquet";
+const PHARMACY_FILINGS_URL = "national_pharmacy_filings.parquet";
+// 検証用: 東京都(関東信越局)のみ、住所からの簡易ジオコーディング結果
+// (facility_id, lat, lon)。医科・薬局それぞれ別ファイル。東京都以外・
+// 関東信越局以外は未対応。
+const TOKYO_GEOCODE_URL = "tokyo_medical_geocoded.parquet";
+const TOKYO_PHARMACY_GEOCODE_URL = "tokyo_pharmacy_geocoded.parquet";
+const PAGE_SIZE = 200;
+// 想定される最大件数(医科の最頻出届出でも約6万件、施設名なしの
+// 全件でも90,400件)を大きく超えないための安全弁。通常はここに
+// 到達しない。
+const HARD_LIMIT = 200000;
+// 地図は「絞り込み条件に合致する全件」を一括描画するのではなく、
+// 施設を1つ選択するたびに、その施設を中心とした半径この距離以内の
+// 施設だけを都度クエリして描画する。この方式なら結果全体の件数に
+// 関わらず描画対象は常に少数(周辺の施設数)に収まるため、以前
+// 必要だった描画件数の上限(MAP_MARKER_LIMIT)は不要になった。
+const NEARBY_RADIUS_KM = 1.5;
+// 周辺検索の半径は常に一定(NEARBY_RADIUS_KM)なので、表示に使う
+// ズームレベルも固定でよい(マーカーの分布に応じた動的計算は不要)。
+// 地図パネルの幅(概ね500〜900px程度)で直径約3kmの範囲を見渡せる
+// ズームレベルとして15を採用している。
+const NEARBY_VIEW_ZOOM = 15;
+// 位置参照情報(ジオコーディングの元データ)は街区レベルの精度しか
+// 持たないため、同じ街区・同じ建物にある複数の施設が、緯度経度
+// 小数点以下まで完全に一致してしまうことがある(東京都・医科で
+// 全体の約43%が該当)。マーカーが完全に重なると、後から描画された
+// 1件しか見えず、他の施設が地図上から消えてしまったように見える。
+// 表示上だけ、元の座標を中心に半径DUPLICATE_OFFSET_RADIUS_M
+// (実際の距離換算)の円周上に均等配置してずらすことで見分けられる
+// ようにする。実データ(facility.lat/lon)自体は変更しない。
+const DUPLICATE_OFFSET_RADIUS_M = 12;
+// マーカーの色分け。#map-legendの凡例・一覧の施設バッジ
+// (.domain-medical/.domain-pharmacy)と同じ配色に揃えている。
+const SELECTED_MARKER_COLOR = "#d90429";
+const MEDICAL_MARKER_COLOR = "#0a6e31";
+const PHARMACY_MARKER_COLOR = "#7a3b96";
+
+const BUREAU_LABELS = {
+  kanto_shinetsu: "関東信越",
+  hokkaido: "北海道",
+  kinki: "近畿",
+  tokaihokuriku: "東海北陸",
+  tohoku: "東北",
+  chugokushikoku: "中国四国",
+  shikoku: "四国",
+  kyushu: "九州",
+};
+
+const DOMAIN_LABELS = {
+  医科: "医科",
+  薬局: "薬局",
+};
+
+function bureauLabel(bureau) {
+  return BUREAU_LABELS[bureau] || bureau || "(局不明)";
+}
+
+function domainClass(domain) {
+  return domain === "薬局" ? "domain-pharmacy" : "domain-medical";
+}
+
+// SQLのORDER BYはUnicodeのコードポイント順になり、ひらがな→カタカナ→
+// 漢字がそれぞれ別のブロックにまとまってしまう(例:「あ」で始まる
+// 施設が全て先頭に固まり、次にカタカナ、その後に漢字の施設が続く)。
+// Intl.Collator('ja')を使うと、読みの近さに応じてひらがな・カタカナ・
+// 漢字が自然に混ざった順序になるため、取得結果はこちらで並べ替える。
+const jaCollator = new Intl.Collator("ja");
+
+function sortByFacilityName(rows) {
+  return rows.slice().sort(function (a, b) {
+    return jaCollator.compare(a.facility_name || "", b.facility_name || "");
+  });
+}
+
+const statusEl = document.getElementById("status");
+const dataLoadingEl = document.getElementById("data-loading");
+const searchBox = document.getElementById("search-box");
+const resultsList = document.getElementById("results-list");
+const resultsCount = document.getElementById("results-count");
+const detailEmpty = document.getElementById("detail-empty");
+const detailContent = document.getElementById("detail-content");
+const detailName = document.getElementById("detail-name");
+const detailBureau = document.getElementById("detail-bureau");
+const detailAddress = document.getElementById("detail-address");
+const detailFilingCount = document.getElementById("detail-filing-count");
+const detailFilings = document.getElementById("detail-filings");
+const resultsPager = document.getElementById("results-pager");
+const pagerLabel = document.getElementById("pager-label");
+const pagerPrev = document.getElementById("pager-prev");
+const pagerNext = document.getElementById("pager-next");
+
+const tabButtonFacility = document.getElementById("tab-button-facility");
+const tabButtonFiling = document.getElementById("tab-button-filing");
+const tabPanelFacility = document.getElementById("tab-panel-facility");
+const tabPanelFiling = document.getElementById("tab-panel-filing");
+const tabButtonMonthly = document.getElementById("tab-button-monthly");
+const tabPanelMonthly = document.getElementById("tab-panel-monthly");
+const monthlySection = document.getElementById("monthly-section");
+const layoutEl = document.querySelector(".layout");
+const monthlySearchBox = document.getElementById("monthly-search-box");
+const monthlyCandidates = document.getElementById("monthly-candidates");
+const monthlyPrefectureSelect = document.getElementById("monthly-prefecture-select");
+const monthlySelectedEl = document.getElementById("monthly-selected");
+const monthlyDomainRadios = document.querySelectorAll('input[name="monthly-domain"]');
+const monthlyMetricRadios = document.querySelectorAll('input[name="monthly-metric"]');
+const filingDomainRadios = document.querySelectorAll('input[name="filing-domain"]');
+const filingBureauSelect = document.getElementById("filing-bureau-select");
+const filingPrefectureSelect = document.getElementById("filing-prefecture-select");
+const filingSearchBox = document.getElementById("filing-search-box");
+const filingCandidates = document.getElementById("filing-candidates");
+const selectedFilingNameEl = document.getElementById("selected-filing-name");
+const mapPanel = document.getElementById("map-panel");
+
+let conn = null;
+let selectedLi = null;
+let detailRequestId = 0;
+let mapRequestId = 0;
+let facilityTotal = 0;
+let medicalTotal = 0;
+let pharmacyTotal = 0;
+let selectedFilingName = null;
+let currentResultRows = [];
+let currentPage = 0;
+let activeTab = "facility";
+let map = null;
+let mapMarkers = [];
+let selectedMarkerEl = null;
+let selectedMarker = null;
+const prefectureCache = {};
+
+function initMap() {
+  map = new maplibregl.Map({
+    container: "map",
+    style: {
+      version: 8,
+      sources: {
+        osm: {
+          type: "raster",
+          tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+          tileSize: 256,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors',
+        },
+      },
+      layers: [{ id: "osm", type: "raster", source: "osm" }],
+    },
+    center: [139.7671, 35.6812],
+    zoom: 10,
+  });
+  map.addControl(new maplibregl.NavigationControl(), "top-right");
+}
+
+function clearMapMarkers() {
+  mapMarkers.forEach(function (m) { m.remove(); });
+  mapMarkers = [];
+  selectedMarkerEl = null;
+  selectedMarker = null;
+}
+
+function resetMap() {
+  clearMapMarkers();
+  mapPanel.hidden = true;
+}
+
+// マーカー1件を生成してmapMarkersに登録する。isSelectedがtrueの
+// 施設(選択した本人)は目立つ赤色、それ以外の周辺施設はdomain
+// (医科/薬局)に応じた色で区別する。
+function addMarker(facility, lat, lon, isSelected) {
+  const name = facility.facility_name || "(名称不明)";
+  const color = isSelected
+    ? SELECTED_MARKER_COLOR
+    : facility.domain === "薬局"
+      ? PHARMACY_MARKER_COLOR
+      : MEDICAL_MARKER_COLOR;
+  const marker = new maplibregl.Marker({ color: color })
+    .setLngLat([lon, lat])
+    .setPopup(new maplibregl.Popup({ offset: 20 }).setText(name))
+    .addTo(map);
+  // ピンをクリックした施設が、一覧から選んだ施設と同じように
+  // 詳細パネル(届出一覧)にも反映され、その施設を中心に周辺が
+  // 再表示されるようにする。地図上のピンは既に画面内に見えている
+  // ため、一覧からの選択と違ってパン&ズームは行わない
+  // (fromPin: trueで抑制する。詳しくはfocusMapOnFacility()を参照)。
+  marker.getElement().addEventListener("click", function () {
+    selectFacility(facility, { fromPin: true });
+  });
+  mapMarkers.push(marker);
+  return marker;
+}
+
+function geocodeViewFor(domain) {
+  return domain === "薬局" ? "tokyo_pharmacy_geocode" : "tokyo_geocode";
+}
+
+// 緯度経度(lat, lon)を中心に、一辺が概ね2*radiusKmの正方形になる
+// 範囲(緯度経度の上下限)を返す。円ではなく矩形での近似だが、
+// 「周辺の施設を大まかに絞り込む」用途としては十分。
+function boundingBox(lat, lon, radiusKm) {
+  const latDelta = radiusKm / 111;
+  const lonDelta = radiusKm / (111 * Math.cos((lat * Math.PI) / 180));
+  return {
+    latMin: lat - latDelta,
+    latMax: lat + latDelta,
+    lonMin: lon - lonDelta,
+    lonMax: lon + lonDelta,
+  };
+}
+
+// 緯度latの地点で、meters分の距離が緯度経度でどれだけの差になるかを
+// 返す(マーカーの表示位置をずらす計算専用。実データの変換には使わない)。
+function metersToLatLonDelta(lat, meters) {
+  const deltaLat = meters / 111320;
+  const deltaLon = meters / (111320 * Math.cos((lat * Math.PI) / 180));
+  return { deltaLat: deltaLat, deltaLon: deltaLon };
+}
+
+// 周辺施設一覧(rows、各要素はfacility_id/lat/lonを持つ)から、
+// マーカーの「表示用」緯度経度を求める。緯度経度が完全に一致する
+// 施設が複数ある場合のみ、元の座標を中心とした半径
+// DUPLICATE_OFFSET_RADIUS_Mの円周上に均等配置してずらす。1件だけの
+// 座標はそのまま(オフセットなし)。戻り値はfacility_id(数値)を
+// キーに{lat, lon}を持つMap。呼び出し元のrows自体(facility.lat/lon)
+// は一切変更しない。
+function computeDisplayCoordinates(rows) {
+  const groups = new Map();
+  rows.forEach(function (row) {
+    const key = Number(row.lat).toFixed(7) + "," + Number(row.lon).toFixed(7);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  });
+
+  const displayCoords = new Map();
+  groups.forEach(function (group) {
+    if (group.length === 1) {
+      const row = group[0];
+      displayCoords.set(Number(row.facility_id), { lat: Number(row.lat), lon: Number(row.lon) });
+      return;
+    }
+
+    const centerLat = Number(group[0].lat);
+    const centerLon = Number(group[0].lon);
+    const delta = metersToLatLonDelta(centerLat, DUPLICATE_OFFSET_RADIUS_M);
+    // 施設IDでソートしておくことで、同じ組み合わせなら毎回同じ配置に
+    // なるようにする(再選択のたびに配置がランダムに変わらないように)。
+    const sorted = group.slice().sort(function (a, b) {
+      return Number(a.facility_id) - Number(b.facility_id);
+    });
+    sorted.forEach(function (row, i) {
+      const angle = (2 * Math.PI * i) / sorted.length;
+      displayCoords.set(Number(row.facility_id), {
+        lat: centerLat + delta.deltaLat * Math.sin(angle),
+        lon: centerLon + delta.deltaLon * Math.cos(angle),
+      });
+    });
+  });
+
+  return displayCoords;
+}
+
+// 選択した施設の周辺施設を取得するSQLを組み立てる。
+// 「施設基準名で検索」タブで選択した場合は、現在選択中の届出名称・
+// ドメイン・(指定されていれば)局・都道府県という、そのタブの
+// 絞り込み条件を周辺検索にも適用する。「施設名で検索」タブには
+// ドメイン等の絞り込みが元々ないため、周辺検索でも医科・薬局を
+// 問わず範囲内の全施設を対象にする。
+function buildNearbyQuery(facility, box) {
+  const latCond = "g.lat BETWEEN " + box.latMin + " AND " + box.latMax;
+  const lonCond = "g.lon BETWEEN " + box.lonMin + " AND " + box.lonMax;
+
+  if (activeTab === "filing" && selectedFilingName) {
+    const domain = facility.domain;
+    const geocodeView = geocodeViewFor(domain);
+    const facilitiesView = facilitiesViewFor(domain);
+    const filingsView = filingsViewFor(domain);
+    let where =
+      latCond + " AND " + lonCond +
+      " AND f.facility_id IN (SELECT facility_id FROM " + filingsView +
+      " WHERE filing_name = '" + escapeSqlLiteral(selectedFilingName) + "')";
+    if (filingBureauSelect.value) {
+      where += " AND f.bureau = '" + escapeSqlLiteral(filingBureauSelect.value) + "'";
+    }
+    if (filingPrefectureSelect.value) {
+      where += " AND f.prefecture_name = '" + escapeSqlLiteral(filingPrefectureSelect.value) + "'";
+    }
+    return (
+      "SELECT f.facility_id, f.facility_name, f.bureau, f.prefecture_name, f.address, f.domain, g.lat, g.lon " +
+      "FROM " + geocodeView + " g JOIN " + facilitiesView + " f ON f.facility_id = g.facility_id " +
+      "WHERE " + where
+    );
+  }
+
+  return (
+    "SELECT f.facility_id, f.facility_name, f.bureau, f.prefecture_name, f.address, f.domain, g.lat, g.lon " +
+    "FROM tokyo_geocode g JOIN medical_facilities f ON f.facility_id = g.facility_id " +
+    "WHERE " + latCond + " AND " + lonCond +
+    " UNION ALL " +
+    "SELECT f.facility_id, f.facility_name, f.bureau, f.prefecture_name, f.address, f.domain, g.lat, g.lon " +
+    "FROM tokyo_pharmacy_geocode g JOIN pharmacy_facilities f ON f.facility_id = g.facility_id " +
+    "WHERE " + latCond + " AND " + lonCond
+  );
+}
+
+async function focusMapOnFacility(facility, options) {
+  // 地図上のピンを直接クリックした場合(fromPin: true)は、その施設は
+  // クリックできた時点で既に画面内に見えているので、一覧からの選択
+  // (画面外にある可能性がある)と違ってパン&ズームは行わない。
+  // 行うと、周辺再取得のたびに毎回ズームアウト→ズームインするような
+  // 不要な動きに見えてしまう。
+  const fromPin = !!(options && options.fromPin);
+
+  const isTokyoGeocoded =
+    facility.bureau === "kanto_shinetsu" &&
+    facility.prefecture_name === "東京都";
+
+  // 施設を連続して選択すると、後から選んだ施設の周辺検索クエリより
+  // 先に前の施設のクエリが完了することがある。古いクエリの結果で
+  // 新しい選択内容を上書きしないよう、showDetail()のdetailRequestId
+  // と同じ考え方でリクエストIDを振り、最新でなければ結果を破棄する。
+  const requestId = ++mapRequestId;
+
+  if (!isTokyoGeocoded) {
+    resetMap();
+    return;
+  }
+
+  const facilityId = Number(facility.facility_id);
+  await ensureData(["geo_med", "geo_ph"].concat(
+    activeTab === "filing" && selectedFilingName
+      ? [facility.domain === "薬局" ? "filings_ph" : "filings_med"] : []
+  ));
+  if (requestId !== mapRequestId) return; // 別の施設が選択済みなので破棄
+  const selfResult = await conn.query(
+    "SELECT lat, lon FROM " + geocodeViewFor(facility.domain) +
+    " WHERE facility_id = " + facilityId
+  );
+  if (requestId !== mapRequestId) return; // 別の施設が選択済みなので破棄
+  const selfRows = selfResult.toArray();
+  if (selfRows.length === 0) {
+    // 本当にジオコーディングされていない施設。
+    resetMap();
+    return;
+  }
+  const centerLat = Number(selfRows[0].lat);
+  const centerLon = Number(selfRows[0].lon);
+
+  const box = boundingBox(centerLat, centerLon, NEARBY_RADIUS_KM);
+  const nearbyResult = await conn.query(buildNearbyQuery(facility, box));
+  if (requestId !== mapRequestId) return; // 別の施設が選択済みなので破棄
+  const nearbyRows = nearbyResult.toArray();
+
+  if (!map) initMap();
+  mapPanel.hidden = false;
+  // #map-panel が非表示(display:none)の間はコンテナの実サイズを
+  // MapLibreが正しく検知できず、表示直後は古い(または初期化時点の)
+  // サイズのままキャンバスが描画されてしまう。表示するたびに明示的に
+  // resize()してキャンバスサイズをコンテナに合わせ直す。
+  map.resize();
+  clearMapMarkers();
+
+  const displayCoords = computeDisplayCoordinates(nearbyRows);
+
+  let selectedMarkerInstance = null;
+  nearbyRows.forEach(function (row) {
+    const coords = displayCoords.get(Number(row.facility_id));
+    const isSelected = Number(row.facility_id) === facilityId;
+    const marker = addMarker(row, coords.lat, coords.lon, isSelected);
+    if (isSelected) selectedMarkerInstance = marker;
+  });
+
+  if (selectedMarkerInstance) {
+    const el = selectedMarkerInstance.getElement();
+    el.classList.add("marker-selected");
+    selectedMarkerEl = el;
+    selectedMarker = selectedMarkerInstance;
+  }
+
+  if (!fromPin) {
+    // 以前はmap.fitBounds()でマーカー分布に応じたズームを自動計算
+    // していたが、これは内部的にアニメーション付きのカメラ遷移
+    // (easeTo)に依存しており、実際に検証したところ、タブが
+    // バックグラウンドの間などrequestAnimationFrameが進行しない
+    // 状況ではカメラが一切動かず、全マーカーが初期表示位置に
+    // 密集してしまうことを確認した。加えて、アニメーション中
+    // (カメラが動いている最中)に周辺のピンをクリックすると、
+    // マウスの押下と離した瞬間でピンの画面上の位置がずれてしまい、
+    // クリックが成立しない(1回目で反応せず2回目で反応する)原因にも
+    // なり得る。周辺検索は常に固定半径(NEARBY_RADIUS_KM)で行って
+    // いるため、マーカー分布に応じた動的なズーム計算は本来不要。
+    // アニメーションなしで即座にカメラを更新するjumpTo()に変更し、
+    // これらの問題を避けている。
+    map.jumpTo({ center: [centerLon, centerLat], zoom: NEARBY_VIEW_ZOOM });
+  }
+
+  if (selectedMarkerInstance) {
+    const popup = selectedMarkerInstance.getPopup();
+    if (popup && !popup.isOpen()) {
+      selectedMarkerInstance.togglePopup();
+    }
+  }
+}
+
+// 遅延読み込みするデータ(届出・病床数の内訳・月次集計・座標)。
+// 起動時は施設のParquet2本とdata_meta.jsonだけを読み、これらは、使う画面を
+// 初めて開いたときに読む。同じデータを複数回読まないよう、読み込みは
+// キーごとに1回だけ(Promiseを使い回す)。
+const LAZY_DATASETS = {
+  filings_med: { url: MEDICAL_FILINGS_URL, file: "medical_filings.parquet", view: "medical_filings" },
+  filings_ph: { url: PHARMACY_FILINGS_URL, file: "pharmacy_filings.parquet", view: "pharmacy_filings" },
+  beds: { url: MEDICAL_FILING_BEDS_URL, file: "medical_filing_beds.parquet", view: "medical_filing_beds" },
+  monthly: { url: MONTHLY_STATS_URL, file: "monthly_filing_stats.parquet", view: "monthly_stats" },
+  geo_med: { url: TOKYO_GEOCODE_URL, file: "tokyo_geocode.parquet", view: "tokyo_geocode" },
+  geo_ph: { url: TOKYO_PHARMACY_GEOCODE_URL, file: "tokyo_pharmacy_geocode.parquet", view: "tokyo_pharmacy_geocode" },
+};
+const lazyPromises = {};
+const lazyDone = {};
+let lazyPending = 0;
+let duckDb = null;
+
+function loadLazyDataset(key) {
+  const def = LAZY_DATASETS[key];
+  if (!def) throw new Error("不明なデータ: " + key);
+  if (!lazyPromises[key]) {
+    lazyPromises[key] = (async function () {
+      const response = await fetch(new URL(def.url, window.location.href).toString(), { cache: "no-store" });
+      if (!response.ok) throw new Error(def.url + " の取得に失敗しました: HTTP " + response.status);
+      const buffer = new Uint8Array(await response.arrayBuffer());
+      await duckDb.registerFileBuffer(def.file, buffer);
+      await conn.query("CREATE VIEW " + def.view + " AS SELECT * FROM read_parquet('" + def.file + "')");
+    })();
+    lazyPromises[key].catch(function () { delete lazyPromises[key]; });
+  }
+  return lazyPromises[key];
+}
+
+async function ensureData(keys) {
+  const pending = keys.filter(function (k) { return !lazyDone[k]; });
+  if (pending.length === 0) return;
+  lazyPending++;
+  dataLoadingEl.hidden = false;
+  try {
+    await Promise.all(pending.map(function (k) {
+      return loadLazyDataset(k).then(function () { lazyDone[k] = true; });
+    }));
+  } finally {
+    lazyPending--;
+    if (lazyPending === 0) dataLoadingEl.hidden = true;
+  }
+}
+
+function escapeSqlLiteral(value) {
+  return value.replace(/'/g, "''");
+}
+
+async function init() {
+  const initStart = performance.now();
+
+  const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
+  const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
+
+  const workerUrl = URL.createObjectURL(
+    new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" })
+  );
+  const worker = new Worker(workerUrl);
+  const logger = new duckdb.ConsoleLogger();
+  const db = new duckdb.AsyncDuckDB(logger, worker);
+  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  URL.revokeObjectURL(workerUrl);
+
+  conn = await db.connect();
+  duckDb = db;
+
+  // registerFileURL(...HTTP...)はDuckDB-WasmがHTTP Rangeリクエストで
+  // 部分取得することを前提にしているが、python3 -m http.serverはRange
+  // リクエストに対応していない(Rangeヘッダーを無視して常に200 OKで
+  // 全体を返す)ため、DuckDB側の読み込み位置計算が壊れて失敗する
+  // (負のtyped array長エラー)。ファイルサイズは数MB程度なので、
+  // fetchで全体を取得してregisterFileBufferする方式にして回避する。
+  async function registerAndView(fileName, url, viewName, domainLiteral) {
+    const response = await fetch(new URL(url, window.location.href).toString(), { cache: "no-store" });
+    const buffer = new Uint8Array(await response.arrayBuffer());
+    await db.registerFileBuffer(fileName, buffer);
+    await conn.query(
+      "CREATE VIEW " + viewName + " AS SELECT *, '" + domainLiteral + "' AS domain " +
+      "FROM read_parquet('" + fileName + "')"
+    );
+  }
+
+  await registerAndView("medical_facilities.parquet", MEDICAL_FACILITIES_URL, "medical_facilities", "医科");
+  await registerAndView("pharmacy_facilities.parquet", PHARMACY_FACILITIES_URL, "pharmacy_facilities", "薬局");
+
+  await conn.query(
+    "CREATE VIEW all_facilities AS " +
+    "SELECT facility_id, facility_name, bureau, prefecture_name, address, postal_code, domain FROM medical_facilities " +
+    "UNION ALL " +
+    "SELECT facility_id, facility_name, bureau, prefecture_name, address, postal_code, domain FROM pharmacy_facilities"
+  );
+
+  const facilityCountResult = await conn.query("SELECT COUNT(*) AS n FROM all_facilities");
+  const medicalCountResult = await conn.query("SELECT COUNT(*) AS n FROM medical_facilities");
+  const pharmacyCountResult = await conn.query("SELECT COUNT(*) AS n FROM pharmacy_facilities");
+
+  facilityTotal = Number(facilityCountResult.toArray()[0].n);
+  medicalTotal = Number(medicalCountResult.toArray()[0].n);
+  pharmacyTotal = Number(pharmacyCountResult.toArray()[0].n);
+
+  const initMs = Math.round(performance.now() - initStart);
+
+  statusEl.textContent =
+    "読み込み完了(DuckDB-Wasm、初期化" + initMs + "ms): 全国8局\n" +
+    "医科: 施設数 " + medicalTotal.toLocaleString() + "件\n" +
+    "薬局: 施設数 " + pharmacyTotal.toLocaleString() + "件\n" +
+    "合計施設数: " + facilityTotal.toLocaleString() + "件";
+  searchBox.disabled = false;
+  filingBureauSelect.disabled = false;
+  filingPrefectureSelect.disabled = false;
+  filingSearchBox.disabled = false;
+  monthlySearchBox.disabled = false;
+  monthlyPrefectureSelect.disabled = false;
+  searchBox.focus();
+  renderResults("");
+  await loadPrefectureOptions(currentFilingDomain());
+}
+
+async function renderResults(query) {
+  if (!query) {
+    resultsList.innerHTML = "";
+    selectedLi = null;
+    resultsPager.hidden = true;
+    resultsCount.textContent = "施設名を入力してください(医科+薬局 全" + facilityTotal.toLocaleString() + "件中)";
+    resetMap();
+    resetDetail();
+    return;
+  }
+
+  const escaped = escapeSqlLiteral(query);
+  const sql =
+    "SELECT facility_id, facility_name, bureau, prefecture_name, address, domain " +
+    "FROM all_facilities WHERE facility_name LIKE '%" + escaped + "%' " +
+    "LIMIT " + HARD_LIMIT;
+
+  await runFacilityQuery(sql, "該当する施設が見つかりません");
+}
+
+async function runFacilityQuery(sql, emptyMessage) {
+  resultsList.innerHTML = "";
+  selectedLi = null;
+  currentResultRows = [];
+  currentPage = 0;
+  // 新しい検索を実行するたびに、前回選択していた施設の詳細
+  // (届出一覧)・地図(周辺表示)が残ったままにならないようリセット
+  // する。地図は施設を選択したときにfocusMapOnFacility()が改めて
+  // 表示するので、ここでは「選択なし」の状態(非表示)に戻すだけ。
+  resetDetail();
+  resetMap();
+
+  const queryStart = performance.now();
+  const result = await conn.query(sql);
+  const queryMs = Math.round(performance.now() - queryStart);
+  const rows = result.toArray();
+
+  if (rows.length === 0) {
+    resultsCount.textContent = emptyMessage + "(" + queryMs + "ms)";
+    resultsPager.hidden = true;
+    return;
+  }
+
+  currentResultRows = sortByFacilityName(rows);
+  currentPage = 0;
+  renderResultsPage(queryMs);
+}
+
+function renderResultsPage(queryMs) {
+  resultsList.innerHTML = "";
+  selectedLi = null;
+
+  const total = currentResultRows.length;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  currentPage = Math.min(Math.max(currentPage, 0), pageCount - 1);
+  const start = currentPage * PAGE_SIZE;
+  const end = Math.min(start + PAGE_SIZE, total);
+  const shown = currentResultRows.slice(start, end);
+
+  const hitLabel = total.toLocaleString() + "件中 " +
+    (start + 1).toLocaleString() + "〜" + end.toLocaleString() + "件目を表示";
+  resultsCount.textContent = hitLabel + (queryMs != null ? "(" + queryMs + "ms)" : "") +
+    (total >= HARD_LIMIT ? "(安全上限に達しました。絞り込みを増やしてください)" : "");
+
+  if (pageCount > 1) {
+    resultsPager.hidden = false;
+    pagerLabel.textContent = (currentPage + 1) + " / " + pageCount + " ページ";
+    pagerPrev.disabled = currentPage === 0;
+    pagerNext.disabled = currentPage >= pageCount - 1;
+  } else {
+    resultsPager.hidden = true;
+  }
+
+  const fragment = document.createDocumentFragment();
+  shown.forEach(function (row) {
+    const li = document.createElement("li");
+    li.dataset.facilityId = String(row.facility_id);
+
+    const nameDiv = document.createElement("div");
+    nameDiv.className = "facility-name";
+    nameDiv.textContent = row.facility_name || "(名称不明)";
+    li.appendChild(nameDiv);
+
+    const domainSpan = document.createElement("span");
+    domainSpan.className = "facility-domain " + domainClass(row.domain);
+    domainSpan.textContent = DOMAIN_LABELS[row.domain] || row.domain;
+    li.appendChild(domainSpan);
+
+    const bureauSpan = document.createElement("span");
+    bureauSpan.className = "facility-bureau";
+    bureauSpan.textContent = bureauLabel(row.bureau);
+    li.appendChild(bureauSpan);
+
+    if (row.prefecture_name) {
+      const prefSpan = document.createElement("span");
+      prefSpan.className = "facility-bureau";
+      prefSpan.textContent = row.prefecture_name;
+      li.appendChild(prefSpan);
+    }
+
+    if (row.address) {
+      const addrDiv = document.createElement("div");
+      addrDiv.className = "facility-address";
+      addrDiv.textContent = row.address;
+      li.appendChild(addrDiv);
+    }
+
+    li.addEventListener("click", function () {
+      selectFacility(row);
+    });
+
+    fragment.appendChild(li);
+  });
+  resultsList.appendChild(fragment);
+}
+
+// 一覧のクリック・地図ピンのクリックのどちらから選んでも、選択状態
+// (一覧のハイライト・詳細パネル)が同じように更新されるようにする
+// ための共通処理。
+function selectFacility(facility, options) {
+  if (selectedLi) selectedLi.classList.remove("selected");
+  const li = resultsList.querySelector(
+    '[data-facility-id="' + CSS.escape(String(facility.facility_id)) + '"]'
+  );
+  if (li) {
+    li.classList.add("selected");
+    selectedLi = li;
+    li.scrollIntoView({ block: "nearest" });
+  } else {
+    // 地図ピンから選んだ施設が、現在表示中の一覧ページには
+    // 含まれていない場合(別ページ・別タブの結果等)。
+    selectedLi = null;
+  }
+  showDetail(facility, options);
+}
+
+function resetDetail() {
+  detailEmpty.style.display = "block";
+  detailContent.style.display = "none";
+  detailFilings.innerHTML = "";
+}
+
+async function showDetail(facility, options) {
+  // 施設を連続して選択すると、後から選んだ施設の届出一覧クエリより先に
+  // 前の施設のクエリが完了することがある(非同期処理の完了順序は保証
+  // されない)。古いクエリの結果で新しい選択内容を上書きしてしまわない
+  // よう、各呼び出しにIDを振り、自分が最新の呼び出しでなければ結果を
+  // 破棄する。
+  const requestId = ++detailRequestId;
+
+  detailEmpty.style.display = "none";
+  detailContent.style.display = "block";
+
+  detailName.textContent = facility.facility_name || "(名称不明)";
+  detailBureau.textContent =
+    (DOMAIN_LABELS[facility.domain] || facility.domain) + " / " +
+    bureauLabel(facility.bureau) + (facility.prefecture_name ? " / " + facility.prefecture_name : "");
+  detailAddress.textContent = facility.address || "";
+  const detailAsofEl = document.getElementById("detail-asof");
+  const asofInfo = asofTextForFacility(facility.bureau, facility.domain);
+  detailAsofEl.textContent = "";
+  if (asofInfo) {
+    const span = document.createElement("span");
+    span.textContent = asofInfo.text;
+    if (asofInfo.lag) span.className = "asof-lag";
+    detailAsofEl.appendChild(span);
+  }
+
+  // 施設全体の病床数(原本の列13を種別ごとに分解した値。届出ごとの病床数ではない)
+  const detailBedsEl = document.getElementById("detail-beds");
+  detailBedsEl.textContent = "";
+  conn.query(
+    "SELECT beds_total, beds_ippan, beds_ryoyo, beds_seishin, beds_kekkaku, beds_kansen, " +
+    "beds_other, beds_status FROM " + facilitiesViewFor(facility.domain) +
+    " WHERE facility_id = " + Number(facility.facility_id) + " LIMIT 1"
+  ).then(function (result) {
+    if (requestId !== detailRequestId) return;
+    const row = result.toArray()[0];
+    if (!row || !row.beds_status) return;
+    const labels = [
+      ["beds_ippan", "一般"], ["beds_ryoyo", "療養"], ["beds_seishin", "精神"],
+      ["beds_kekkaku", "結核"], ["beds_kansen", "感染症"], ["beds_other", "その他"],
+    ];
+    const parts = [];
+    labels.forEach(function (pair) {
+      const value = row[pair[0]];
+      if (value !== null && value !== undefined) parts.push(pair[1] + " " + Number(value).toLocaleString() + "床");
+    });
+    const note = document.createElement("span");
+    note.className = "beds-note";
+    if (row.beds_status === "no_count") {
+      detailBedsEl.textContent = "病床数(施設全体): 種別のみの記載で、数の記載なし";
+      return;
+    }
+    detailBedsEl.textContent =
+      "病床数(施設全体): " + parts.join(" / ") + "(合計 " + Number(row.beds_total).toLocaleString() + "床)";
+    note.textContent = row.beds_status === "partial"
+      ? " ※一部の種別は数の記載なし。届出ごとの病床数ではありません。"
+      : " ※届出ごとの病床数ではありません。";
+    detailBedsEl.appendChild(note);
+  }).catch(function (error) {
+    console.error("病床数の取得に失敗しました:", error);
+  });
+
+  focusMapOnFacility(facility, options).catch(function (error) {
+    console.error("地図のフォーカスに失敗しました:", error);
+  });
+
+  const isMedical = facility.domain === "医科";
+  await ensureData(isMedical ? ["filings_med", "beds"] : ["filings_ph"]);
+  if (requestId !== detailRequestId) return; // 別の施設が選択済みなので破棄
+  const sql = isMedical
+    ? "SELECT filing_name, filing_symbol, filing_number, " +
+      "has_standard_source, has_itemized_source, category_name, category_group, " +
+      "bed_count_sum, n_values, dup_suspect, exceeds_facility_total, bed_source, same_name_in_main " +
+      "FROM medical_filings WHERE facility_id = " + Number(facility.facility_id) +
+      " ORDER BY filing_name"
+    : "SELECT filing_name, filing_symbol, filing_number FROM pharmacy_filings " +
+      "WHERE facility_id = " + Number(facility.facility_id) +
+      " ORDER BY filing_name";
+
+  const result = await conn.query(sql);
+  if (requestId !== detailRequestId) return; // 別の施設が選択済みなので破棄
+  const rows = result.toArray();
+
+  // 病棟以外の別の量(治療室・入院医療管理料・入退院支援など)。届出Parquetとは
+  // (facility_id, filing_name, filing_symbol, filing_number)で結び付ける。
+  const otherBedsByFiling = new Map();
+  if (isMedical) {
+    const bedsResult = await conn.query(
+      "SELECT filing_name, filing_symbol, filing_number, bed_kind, bed_count, source_heading " +
+      "FROM medical_filing_beds WHERE facility_id = " + Number(facility.facility_id) +
+      " AND bed_kind <> '病棟' ORDER BY filing_name, filing_number, bed_kind, source_heading, seq"
+    );
+    if (requestId !== detailRequestId) return;
+    bedsResult.toArray().forEach(function (b) {
+      const key = [b.filing_name, b.filing_symbol, b.filing_number].join("\u0001");
+      if (!otherBedsByFiling.has(key)) otherBedsByFiling.set(key, []);
+      otherBedsByFiling.get(key).push(b);
+    });
+  }
+
+  detailFilingCount.textContent = "届出件数: " + rows.length.toLocaleString() + "件";
+
+  detailFilings.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+  rows.forEach(function (row) {
+    const li = document.createElement("li");
+    const symbolText = row.filing_symbol ? "（" + row.filing_symbol + "）" : "";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = (row.filing_name || "") + symbolText;
+    li.appendChild(nameSpan);
+
+    if (isMedical) {
+      const hasStandard = Number(row.has_standard_source) === 1;
+      const hasItemized = Number(row.has_itemized_source) === 1;
+
+      if (hasItemized && !hasStandard) {
+        li.classList.add("itemized-only-row");
+        const tag = document.createElement("span");
+        tag.className = "category-tag-itemized-only";
+        tag.textContent = row.category_group
+          ? "項目別データのみに掲載（" + row.category_group + "）"
+          : "項目別データのみに掲載";
+        li.appendChild(tag);
+      } else if (hasItemized && hasStandard && row.category_group) {
+        const tag = document.createElement("span");
+        tag.className = "category-tag-subtle";
+        tag.textContent = "（項目別区分: " + row.category_group + "）";
+        li.appendChild(tag);
+      }
+    }
+
+    if (isMedical && row.same_name_in_main) {
+      const note = document.createElement("span");
+      note.className = "filing-beds-flag";
+      note.textContent = "同じ名前の届出が主名簿にもあります(番号が異なります)";
+      li.appendChild(note);
+    }
+
+    if (isMedical && row.bed_count_sum !== null && row.bed_count_sum !== undefined) {
+      const nValues = Number(row.n_values);
+      const beds = document.createElement("span");
+      beds.className = "filing-beds";
+      beds.textContent =
+        "届出の病床数 " + Number(row.bed_count_sum).toLocaleString() + "床" +
+        (nValues > 1 ? "(" + nValues + "件の記載の合計)" : "") +
+        (row.bed_source === "main" ? "[主名簿の記載]" : row.bed_source === "itemized" ? "[項目別の記載]" : "");
+      li.appendChild(beds);
+      if (Number(row.dup_suspect) === 1) {
+        const flag = document.createElement("span");
+        flag.className = "filing-beds-flag";
+        flag.textContent = "同じ内容の記載が連続しており、重複記載の疑いがあります(合計が実際より多い可能性)";
+        li.appendChild(flag);
+      }
+      if (Number(row.exceeds_facility_total) === 1) {
+        const flag = document.createElement("span");
+        flag.className = "filing-beds-flag";
+        flag.textContent = "施設全体の病床数(同じ種別)を超えています(名簿の記載どおりの値です)";
+        li.appendChild(flag);
+      }
+    }
+
+    const otherItems = isMedical
+      ? otherBedsByFiling.get([row.filing_name, row.filing_symbol, row.filing_number].join("\u0001"))
+      : null;
+    if (otherItems && otherItems.length) {
+      const other = document.createElement("span");
+      other.className = "filing-beds-other";
+      other.textContent = "別の量(病棟の病床数とは別で、合計に含みません): " + formatOtherBeds(otherItems);
+      li.appendChild(other);
+    }
+
+    fragment.appendChild(li);
+  });
+  detailFilings.appendChild(fragment);
+}
+
+// 病棟以外の別の量の表示文。種別ごとに値を並べるだけで、足し合わせない。
+// 入退院支援は⑤⑥④が別々の量なので、見出しの頭の記号で分けて表示する。
+const OTHER_BED_LABELS = {
+  "治療室": "治療室",
+  "入院医療管理料": "入院医療管理料",
+  "小児病室": "小児の病室",
+  "緩和ケア病棟総数": "緩和ケア病棟の総数",
+  "回復室": "回復室",
+  "病棟群全体": "病棟群全体(確認用)"
+};
+const SUPPORT_BED_LABELS = {
+  "⑤": "入退院支援⑤(療養病棟入院基本料等の算定病床)",
+  "⑥": "入退院支援⑥(一般病棟入院基本料等の算定病床)",
+  "④": "入退院支援④(地域包括医療病棟入院料等の算定病床)"
+};
+const OTHER_BED_ORDER = ["治療室", "入院医療管理料", "小児病室", "緩和ケア病棟総数", "回復室", "入退院支援", "病棟群全体"];
+
+function formatOtherBeds(items) {
+  const groups = new Map();
+  items.forEach(function (item) {
+    let label;
+    if (item.bed_kind === "入退院支援") {
+      label = SUPPORT_BED_LABELS[String(item.source_heading).charAt(0)] || "入退院支援(区分不明)";
+    } else {
+      label = OTHER_BED_LABELS[item.bed_kind] || item.bed_kind;
+    }
+    const order = OTHER_BED_ORDER.indexOf(item.bed_kind) * 10 + (item.bed_kind === "入退院支援" ? "⑤⑥④".indexOf(String(item.source_heading).charAt(0)) : 0);
+    if (!groups.has(label)) groups.set(label, { order: order, values: [] });
+    groups.get(label).values.push(Number(item.bed_count) + "床");
+  });
+  return Array.from(groups.entries())
+    .sort(function (a, b) { return a[1].order - b[1].order; })
+    .map(function (entry) { return entry[0] + " " + entry[1].values.join("・"); })
+    .join(" / ");
+}
+
+searchBox.addEventListener("input", function () {
+  renderResults(searchBox.value.trim());
+});
+
+pagerPrev.addEventListener("click", function () {
+  if (currentPage > 0) {
+    currentPage -= 1;
+    renderResultsPage(null);
+  }
+});
+pagerNext.addEventListener("click", function () {
+  const pageCount = Math.ceil(currentResultRows.length / PAGE_SIZE);
+  if (currentPage < pageCount - 1) {
+    currentPage += 1;
+    renderResultsPage(null);
+  }
+});
+
+// --- タブ切り替え ---
+
+function switchTab(tab) {
+  const isMonthly = tab === "monthly";
+  const isFacility = tab === "facility";
+  activeTab = tab;
+  tabButtonFacility.classList.toggle("active", isFacility);
+  tabButtonFiling.classList.toggle("active", tab === "filing");
+  tabButtonMonthly.classList.toggle("active", isMonthly);
+  tabPanelFacility.hidden = !isFacility;
+  tabPanelFiling.hidden = tab !== "filing";
+  tabPanelMonthly.hidden = !isMonthly;
+  monthlySection.hidden = !isMonthly;
+  layoutEl.style.display = isMonthly ? "none" : "";
+  if (isMonthly) {
+    initMonthly();
+    return;
+  }
+
+  if (isFacility) {
+    renderResults(searchBox.value.trim());
+  } else if (selectedFilingName) {
+    runFilingReverseLookup();
+  } else {
+    resultsList.innerHTML = "";
+    selectedLi = null;
+    resultsPager.hidden = true;
+    resultsCount.textContent = "届出名称を選択してください";
+    resetMap();
+    resetDetail();
+  }
+}
+
+tabButtonFacility.addEventListener("click", function () {
+  switchTab("facility");
+});
+tabButtonFiling.addEventListener("click", function () {
+  switchTab("filing");
+});
+tabButtonMonthly.addEventListener("click", function () {
+  switchTab("monthly");
+});
+
+// --- 月ごとの変化(monthly_filing_stats) ---
+// 月は名簿の「現在日」の月(取得日ではない)。月が抜けている局は線をつながない。
+const MONTHLY_BUREAUS = Object.keys(BUREAU_LABELS);
+const MONTHLY_COLORS = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#ff7f0e", "#8c564b", "#17becf", "#e377c2"];
+let monthlyInitialized = false;
+let monthlySelectedName = null;
+let monthlyRequestId = 0;
+
+function currentMonthlyDomain() {
+  for (const radio of monthlyDomainRadios) if (radio.checked) return radio.value;
+  return "医科";
+}
+function currentMonthlyMetric() {
+  for (const radio of monthlyMetricRadios) if (radio.checked) return radio.value;
+  return "facilities";
+}
+
+async function loadMonthlyPrefectures() {
+  monthlyPrefectureSelect.innerHTML = '<option value="">(全都道府県)</option>';
+  const result = await conn.query(
+    "SELECT DISTINCT prefecture_code, prefecture_name FROM " + facilitiesViewFor(currentMonthlyDomain()) +
+    " WHERE prefecture_name IS NOT NULL ORDER BY prefecture_code"
+  );
+  result.toArray().forEach(function (row) {
+    const option = document.createElement("option");
+    option.value = row.prefecture_code;
+    option.textContent = row.prefecture_name;
+    monthlyPrefectureSelect.appendChild(option);
+  });
+}
+
+async function initMonthly() {
+  await ensureData(["monthly"]);
+  if (!monthlyInitialized) {
+    monthlyInitialized = true;
+    await loadMonthlyPrefectures();
+    await loadFilingNameRelations();
+  }
+  if (monthlySelectedName) await renderMonthly();
+}
+
+function monthlyAxis(first, last) {
+  const months = [];
+  let [y, m] = first.split("-").map(Number);
+  const [ly, lm] = last.split("-").map(Number);
+  while (y < ly || (y === ly && m <= lm)) {
+    months.push(y + "-" + String(m).padStart(2, "0"));
+    m += 1;
+    if (m > 12) { m = 1; y += 1; }
+  }
+  return months;
+}
+
+// 届出名の関係の対応表(人が一次資料で確認した行=confirmedだけを出す。集計はまとめない)
+let confirmedRelations = [];
+const RELATION_LABELS = { rename: "名称の変更", successor: "後継", related: "関連" };
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = "", quoted = false;
+  text = text.replace(/^﻿/, "");
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (ch === '"') quoted = false;
+      else field += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ",") { row.push(field); field = ""; }
+    else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); field = "";
+      if (row.length > 1 || row[0] !== "") rows.push(row);
+      row = [];
+    } else field += ch;
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+async function loadFilingNameRelations() {
+  try {
+    const response = await fetch(new URL(FILING_NAME_RELATIONS_URL, window.location.href).toString(), { cache: "no-store" });
+    if (!response.ok) return;
+    const rows = parseCsv(await response.text());
+    const header = rows[0];
+    confirmedRelations = rows.slice(1).map(function (r) {
+      const o = {};
+      header.forEach(function (h, i) { o[h] = r[i] || ""; });
+      return o;
+    }).filter(function (o) { return o.status === "confirmed" && RELATION_LABELS[o.relation]; });
+  } catch (error) {
+    console.error("届出名の関係の対応表の取得に失敗しました:", error);
+  }
+}
+
+function renderRelatedNames() {
+  const wrap = document.getElementById("monthly-related");
+  wrap.innerHTML = "";
+  const related = confirmedRelations.filter(function (r) {
+    return r.name_a === monthlySelectedName || r.name_b === monthlySelectedName;
+  });
+  if (!related.length) return;
+  const title = document.createElement("p");
+  title.style.cssText = "font-size:13px;font-weight:bold;margin:8px 0 2px;";
+  title.textContent = "関連する届出名(出典で確認されたもの。集計はまとめていません)";
+  wrap.appendChild(title);
+  related.forEach(function (r) {
+    const other = r.name_a === monthlySelectedName ? r.name_b : r.name_a;
+    const p = document.createElement("p");
+    p.style.cssText = "font-size:13px;margin:2px 0;";
+    const link = document.createElement("a");
+    link.href = "#";
+    link.textContent = other;
+    link.addEventListener("click", function (event) {
+      event.preventDefault();
+      monthlySelectedName = other;
+      monthlySearchBox.value = other;
+      monthlySelectedEl.textContent = "選択中の届出名称: " + other;
+      renderMonthly();
+    });
+    p.appendChild(link);
+    p.appendChild(document.createTextNode("(" + RELATION_LABELS[r.relation] + "。出典: " + r.source_title + " "));
+    const src = document.createElement("a");
+    src.href = r.source_url; src.textContent = r.source_url; src.target = "_blank"; src.rel = "noopener";
+    p.appendChild(src);
+    p.appendChild(document.createTextNode(" 確認日 " + r.checked_date + ")"));
+    wrap.appendChild(p);
+  });
+}
+
+async function renderMonthlyCandidates(query) {
+  monthlyCandidates.innerHTML = "";
+  if (!query) return;
+  await ensureData(["monthly"]);
+  const result = await conn.query(
+    "SELECT DISTINCT filing_name FROM monthly_stats WHERE domain = '" + currentMonthlyDomain() +
+    "' AND filing_name LIKE '%" + escapeSqlLiteral(query) + "%' ORDER BY filing_name LIMIT 50"
+  );
+  result.toArray().forEach(function (row) {
+    const li = document.createElement("li");
+    li.textContent = row.filing_name;
+    li.addEventListener("click", function () {
+      monthlySelectedName = row.filing_name;
+      monthlySearchBox.value = row.filing_name;
+      monthlyCandidates.innerHTML = "";
+      monthlySelectedEl.textContent = "選択中の届出名称: " + row.filing_name;
+      renderMonthly();
+    });
+    monthlyCandidates.appendChild(li);
+  });
+}
+
+async function renderMonthly() {
+  const requestId = ++monthlyRequestId;
+  await ensureData(["monthly"]);
+  const domain = currentMonthlyDomain();
+  const metric = currentMonthlyMetric();
+  const prefecture = monthlyPrefectureSelect.value;
+  const prefWhere = prefecture ? " AND prefecture_code = '" + escapeSqlLiteral(prefecture) + "'" : "";
+  // その月にデータがあった局(届出名に関係なく、領域・都道府県で決める)と、その月の名簿の有無
+  const availability = (await conn.query(
+    "SELECT bureau, as_of_month, MAX(CAST(has_main AS INTEGER)) AS has_main, " +
+    "MAX(CAST(has_itemized AS INTEGER)) AS has_itemized, " +
+    "MAX(CAST(beds_source_available AS INTEGER)) AS beds_ok FROM monthly_stats " +
+    "WHERE domain = '" + domain + "'" + prefWhere + " GROUP BY bureau, as_of_month"
+  )).toArray();
+  const values = (await conn.query(
+    "SELECT bureau, as_of_month, CAST(SUM(n_facilities) AS DOUBLE) AS n_fac, CAST(SUM(sum_filing_beds) AS DOUBLE) AS beds, " +
+    "MAX(CAST(in_itemized_roster AS INTEGER)) AS in_item FROM monthly_stats " +
+    "WHERE domain = '" + domain + "' AND filing_name = '" + escapeSqlLiteral(monthlySelectedName) + "'" + prefWhere +
+    " GROUP BY bureau, as_of_month"
+  )).toArray();
+  // 届出名が出てくる最初の月と最後の月(都道府県の絞り込みに関係なく、局ごと)と、局の主名簿のある月
+  const span = (await conn.query(
+    "SELECT bureau, MIN(as_of_month) AS first_month, MAX(as_of_month) AS last_month FROM monthly_stats " +
+    "WHERE domain = '" + domain + "' AND filing_name = '" + escapeSqlLiteral(monthlySelectedName) + "' GROUP BY bureau"
+  )).toArray();
+  const mainMonthRows = (await conn.query(
+    "SELECT DISTINCT bureau, as_of_month FROM monthly_stats WHERE domain = '" + domain + "' AND has_main"
+  )).toArray();
+  if (requestId !== monthlyRequestId) return;
+
+  const cell = {}; // bureau -> month -> {value, hasMain, hasItemized, bedsOk}
+  availability.forEach(function (r) {
+    (cell[r.bureau] = cell[r.bureau] || {})[r.as_of_month] = {
+      value: 0, hasMain: Number(r.has_main) === 1, hasItemized: Number(r.has_itemized) === 1, bedsOk: Number(r.beds_ok) === 1,
+    };
+  });
+  const inItemized = {};
+  values.forEach(function (r) {
+    const c = cell[r.bureau] && cell[r.bureau][r.as_of_month];
+    if (c) c.value = Number(metric === "beds" ? r.beds : r.n_fac);
+    if (Number(r.in_item) === 1) inItemized[r.bureau] = true;
+  });
+  // 項目別だけの月で、その局の項目別の名簿に一度も出てこない届出名は、0にせず「載らない届出」とする
+  Object.keys(cell).forEach(function (b) {
+    Object.keys(cell[b]).forEach(function (mo) {
+      const c = cell[b][mo];
+      c.notListed = !c.hasMain && !inItemized[b];
+    });
+  });
+  const bureaus = MONTHLY_BUREAUS.filter(function (b) { return cell[b]; });
+  const allMonths = availability.map(function (r) { return r.as_of_month; }).sort();
+  const wrap = document.getElementById("monthly-chart-wrap");
+  const legend = document.getElementById("monthly-legend");
+  const foot = document.getElementById("monthly-footnotes");
+  const tableWrap = document.getElementById("monthly-table-wrap");
+  if (!allMonths.length) {
+    wrap.textContent = "該当するデータがありません";
+    legend.innerHTML = ""; foot.innerHTML = ""; tableWrap.innerHTML = "";
+    document.getElementById("monthly-related").innerHTML = "";
+    document.getElementById("monthly-current-total").innerHTML = "";
+    return;
+  }
+  const months = monthlyAxis(allMonths[0], allMonths[allMonths.length - 1]);
+  const unit = metric === "beds" ? "床" : "施設";
+  // 表示する点: 病床数のときは、病床数を取れる名簿がある月だけ
+  const shown = function (c) { return c && !c.notListed && (metric !== "beds" || c.bedsOk); };
+
+  // 全国の合計: 全8局のデータがそろった月だけ(都道府県で絞ったときは出さない)
+  const total = {};
+  months.forEach(function (mo) {
+    const ok = MONTHLY_BUREAUS.filter(function (b) { return shown(cell[b] && cell[b][mo]); });
+    total[mo] = { n: ok.length, value: ok.reduce(function (a, b) { return a + cell[b][mo].value; }, 0) };
+  });
+
+  // グラフ(SVG)
+  const W = 760, H = 320, L = 64, R = 16, T = 16, B = 40;
+  let max = 0;
+  bureaus.forEach(function (b) { months.forEach(function (mo) { if (shown(cell[b][mo])) max = Math.max(max, cell[b][mo].value); }); });
+  if (!prefecture) months.forEach(function (mo) { if (total[mo].n === MONTHLY_BUREAUS.length) max = Math.max(max, total[mo].value); });
+  max = max || 1;
+  const x = function (i) { return L + (months.length === 1 ? (W - L - R) / 2 : i * (W - L - R) / (months.length - 1)); };
+  const y = function (v) { return T + (H - T - B) * (1 - v / max); };
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  const add = function (tag, attrs, text) {
+    const e = document.createElementNS(NS, tag);
+    Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    if (text !== undefined) e.textContent = text;
+    svg.appendChild(e);
+    return e;
+  };
+  for (let t = 0; t <= 4; t++) {
+    const v = max * t / 4;
+    add("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: "#e5e5e5" });
+    add("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "#555" }, Math.round(v).toLocaleString());
+  }
+  months.forEach(function (mo, i) {
+    add("text", { x: x(i), y: H - 16, "text-anchor": "middle", "font-size": 12, fill: "#333" }, mo);
+  });
+  const drawSeries = function (label, color, getPoint, width) {
+    let run = [];
+    const flush = function () {
+      if (run.length > 1) {
+        // 項目別だけの月につながる区間は破線
+        for (let k = 1; k < run.length; k++) {
+          const dashed = !run[k - 1].hasMain || !run[k].hasMain;
+          add("line", { x1: x(run[k - 1].i), y1: y(run[k - 1].v), x2: x(run[k].i), y2: y(run[k].v),
+            stroke: color, "stroke-width": width, "stroke-dasharray": dashed ? "5 4" : "none" });
+        }
+      }
+      run = [];
+    };
+    months.forEach(function (mo, i) {
+      const p = getPoint(mo);
+      if (p === null) { flush(); return; }  // 抜けた月・表示しない月は線を途切れさせる
+      run.push({ i: i, v: p.value, hasMain: p.hasMain });
+    });
+    flush();
+    months.forEach(function (mo, i) {
+      const p = getPoint(mo);
+      if (p === null) return;
+      let e;
+      if (p.hasMain) {
+        e = add("circle", { cx: x(i), cy: y(p.value), r: 4, fill: color });
+      } else { // 項目別だけの月: 菱形
+        e = add("rect", { x: x(i) - 5, y: y(p.value) - 5, width: 10, height: 10, fill: "#fff", stroke: color, "stroke-width": 2,
+          transform: "rotate(45 " + x(i) + " " + y(p.value) + ")" });
+      }
+      const title = document.createElementNS(NS, "title");
+      title.textContent = label + " " + mo + ": " + p.value.toLocaleString() + unit + (p.hasMain ? "" : "(項目別だけの月)");
+      e.appendChild(title);
+    });
+  };
+  bureaus.forEach(function (b) {
+    const color = MONTHLY_COLORS[MONTHLY_BUREAUS.indexOf(b)];
+    drawSeries(BUREAU_LABELS[b], color, function (mo) {
+      const c = cell[b][mo];
+      return shown(c) ? c : null;
+    }, 2);
+  });
+  if (!prefecture) {
+    drawSeries("全国合計", "#222", function (mo) {
+      return total[mo].n === MONTHLY_BUREAUS.length
+        ? { value: total[mo].value, hasMain: MONTHLY_BUREAUS.every(function (b) { return cell[b][mo].hasMain; }) } : null;
+    }, 3);
+  }
+  wrap.innerHTML = "";
+  wrap.appendChild(svg);
+
+  legend.innerHTML = "";
+  const addLegend = function (label, color, thick) {
+    const span = document.createElement("span");
+    const sw = document.createElement("span");
+    sw.className = "swatch"; sw.style.background = color; if (thick) sw.style.height = "4px";
+    span.appendChild(sw); span.appendChild(document.createTextNode(label));
+    legend.appendChild(span);
+  };
+  bureaus.forEach(function (b) { addLegend(BUREAU_LABELS[b], MONTHLY_COLORS[MONTHLY_BUREAUS.indexOf(b)], false); });
+  if (!prefecture) addLegend("全国合計(全8局がそろった月だけ)", "#222", true);
+  const legendShape = document.createElement("span");
+  legendShape.textContent = "● 主名簿のある月 / ◇ 項目別だけの月(主名簿なし)";
+  legend.appendChild(legendShape);
+
+  // 注記
+  foot.innerHTML = "";
+  renderRelatedNames();
+  const notes = [];
+  const itemizedOnly = [];
+  bureaus.forEach(function (b) {
+    months.forEach(function (mo) {
+      const c = cell[b][mo];
+      if (c && !c.hasMain && shown(c)) itemizedOnly.push(BUREAU_LABELS[b] + " " + mo);
+    });
+  });
+  if (itemizedOnly.length) {
+    notes.push("◇は項目別だけの月です(主名簿が無い月で、件数は他の月と比べられません。破線でつないでいます): " + itemizedOnly.join("、") +
+      "。項目別だけの月は、項目別の名簿に載る届出(局によって主に入院系)だけを数えています。");
+  }
+  if (metric === "beds") {
+    const noBeds = [];
+    bureaus.forEach(function (b) {
+      months.forEach(function (mo) {
+        const c = cell[b][mo];
+        if (c && !c.bedsOk) noBeds.push(BUREAU_LABELS[b] + " " + mo);
+      });
+    });
+    notes.push("届出の病床数は、病床数を取れる名簿がある月だけ表示しています(主名簿に病床数がある局は主名簿のある月、それ以外の局は項目別のある月)。" +
+      (noBeds.length ? "表示していない月: " + noBeds.join("、") : ""));
+  }
+  const notListed = [];
+  bureaus.forEach(function (b) {
+    months.forEach(function (mo) {
+      const c = cell[b][mo];
+      if (c && c.notListed) notListed.push(BUREAU_LABELS[b] + " " + mo);
+    });
+  });
+  if (notListed.length) {
+    notes.push("この月の名簿(項目別だけ)には載らない届出です(0ではありません。線にも出していません): " + notListed.join("、"));
+  }
+  // 届出名が名簿から見られなくなった月・見られるようになった月(理由は書かない)
+  const mainMonths = {};
+  mainMonthRows.forEach(function (r) { (mainMonths[r.bureau] = mainMonths[r.bureau] || []).push(r.as_of_month); });
+  const ymLabel = function (mo) { const p = mo.split("-"); return p[0] + "年" + Number(p[1]) + "月"; };
+  MONTHLY_BUREAUS.forEach(function (b) {
+    const sp = span.find(function (r) { return r.bureau === b; });
+    if (!sp) return;
+    const ms = (mainMonths[b] || []).slice().sort();
+    const gone = ms.find(function (m) { return m > sp.last_month; });
+    if (gone) notes.push("この届出名は、" + BUREAU_LABELS[b] + "局の名簿では " + ymLabel(gone) + "の現在日以降に見られません。");
+    if (ms.some(function (m) { return m < sp.first_month; })) {
+      notes.push("この届出名は、" + BUREAU_LABELS[b] + "局の名簿では " + ymLabel(sp.first_month) + "の現在日から見られます。");
+    }
+  });
+  if (prefecture) notes.push("都道府県で絞り込んでいるため、全国合計は出していません。");
+  notes.forEach(function (text) {
+    const p = document.createElement("p");
+    p.style.cssText = "font-size:13px;color:#555;margin:4px 0;";
+    p.textContent = text;
+    foot.appendChild(p);
+  });
+
+  // 表
+  const table = document.createElement("table");
+  table.id = "monthly-table";
+  const head = table.insertRow();
+  ["月"].concat(bureaus.map(function (b) { return BUREAU_LABELS[b]; })).concat(prefecture ? [] : ["全国合計"]).forEach(function (t) {
+    const th = document.createElement("th"); th.textContent = t; head.appendChild(th);
+  });
+  months.forEach(function (mo) {
+    const tr = table.insertRow();
+    const th = document.createElement("th"); th.textContent = mo; tr.appendChild(th);
+    bureaus.forEach(function (b) {
+      const td = tr.insertCell();
+      const c = cell[b][mo];
+      if (!c) { td.className = "monthly-missing"; td.textContent = "データなし"; }
+      else if (c.notListed) { td.className = "monthly-missing"; td.textContent = "この月の名簿(項目別だけ)には載らない届出です"; }
+      else if (!shown(c)) { td.className = "monthly-missing"; td.textContent = "病床数なし"; }
+      else {
+        td.textContent = c.value.toLocaleString() + (c.hasMain ? "" : " ◇");
+        if (!c.hasMain) td.className = "monthly-itemized";
+      }
+    });
+    if (!prefecture) {
+      const td = tr.insertCell();
+      const t = total[mo];
+      if (t.n === MONTHLY_BUREAUS.length) td.textContent = t.value.toLocaleString();
+      else { td.className = "monthly-total-missing"; td.textContent = "この月は" + (MONTHLY_BUREAUS.length - t.n) + "局のデータがありません"; }
+    }
+  });
+  tableWrap.innerHTML = "";
+  tableWrap.appendChild(table);
+
+  // 現在値の全国合計: 各局の最新の月を足す(全局がそろった月の全国合計とは別)
+  const currentWrap = document.getElementById("monthly-current-total");
+  currentWrap.innerHTML = "";
+  if (!prefecture) {
+    const latest = bureaus.map(function (b) {
+      const ms = months.filter(function (mo) { return cell[b][mo]; });
+      const mo = ms[ms.length - 1];
+      return { b: b, mo: mo, c: cell[b][mo] };
+    });
+    const used = latest.filter(function (x) { return shown(x.c); });
+    const sum = used.reduce(function (a, x) { return a + x.c.value; }, 0);
+    const h = document.createElement("p");
+    h.style.cssText = "margin:12px 0 4px;font-weight:bold;";
+    h.textContent = "現在値の全国合計(各局の最新の月の合計): " + sum.toLocaleString() + unit;
+    currentWrap.appendChild(h);
+    const detail = document.createElement("p");
+    detail.style.cssText = "font-size:13px;color:#333;margin:2px 0;";
+    detail.textContent = "内訳(局 月: 値): " + latest.map(function (x) {
+      return BUREAU_LABELS[x.b] + " " + x.mo + ": " + (shown(x.c) ? x.c.value.toLocaleString() : "病床数なし");
+    }).join("、");
+    currentWrap.appendChild(detail);
+    const warn = document.createElement("p");
+    warn.style.cssText = "font-size:13px;color:#b00020;margin:2px 0;";
+    warn.textContent = "局によって現在日の月が異なる合計です(全局がそろった月の全国合計とは別のものです)。対象 " +
+      used.length + "/" + MONTHLY_BUREAUS.length + "局。";
+    currentWrap.appendChild(warn);
+    const itemizedLatest = latest.filter(function (x) { return !x.c.hasMain; });
+    if (itemizedLatest.length) {
+      const p = document.createElement("p");
+      p.style.cssText = "font-size:13px;color:#555;margin:2px 0;";
+      p.textContent = "最新の月が項目別だけの局があります(項目別の名簿に載る届出だけの値): " +
+        itemizedLatest.map(function (x) { return BUREAU_LABELS[x.b] + " " + x.mo; }).join("、");
+      currentWrap.appendChild(p);
+    }
+  }
+}
+
+monthlySearchBox.addEventListener("input", function () {
+  monthlySelectedName = null;
+  renderMonthlyCandidates(monthlySearchBox.value.trim());
+});
+monthlyPrefectureSelect.addEventListener("change", function () {
+  if (monthlySelectedName) renderMonthly();
+});
+for (const radio of monthlyMetricRadios) {
+  radio.addEventListener("change", function () {
+    if (monthlySelectedName) renderMonthly();
+  });
+}
+for (const radio of monthlyDomainRadios) {
+  radio.addEventListener("change", async function () {
+    monthlySelectedName = null;
+    monthlySearchBox.value = "";
+    monthlyCandidates.innerHTML = "";
+    monthlySelectedEl.textContent = "届出名称を選択してください(候補一覧から選んでください)。";
+    document.getElementById("monthly-chart-wrap").innerHTML = "";
+    document.getElementById("monthly-legend").innerHTML = "";
+    document.getElementById("monthly-footnotes").innerHTML = "";
+    document.getElementById("monthly-related").innerHTML = "";
+    document.getElementById("monthly-table-wrap").innerHTML = "";
+    document.getElementById("monthly-current-total").innerHTML = "";
+    await loadMonthlyPrefectures();
+  });
+}
+
+// --- 施設基準名(届出名称)からの逆引き ---
+
+for (const bureauCode of Object.keys(BUREAU_LABELS)) {
+  const option = document.createElement("option");
+  option.value = bureauCode;
+  option.textContent = BUREAU_LABELS[bureauCode];
+  filingBureauSelect.appendChild(option);
+}
+
+function currentFilingDomain() {
+  for (const radio of filingDomainRadios) {
+    if (radio.checked) return radio.value;
+  }
+  return "医科";
+}
+
+function filingsViewFor(domain) {
+  return domain === "薬局" ? "pharmacy_filings" : "medical_filings";
+}
+
+function facilitiesViewFor(domain) {
+  return domain === "薬局" ? "pharmacy_facilities" : "medical_facilities";
+}
+
+async function loadPrefectureOptions(domain) {
+  filingPrefectureSelect.innerHTML = '<option value="">(全都道府県)</option>';
+
+  if (!prefectureCache[domain]) {
+    const sql =
+      "SELECT DISTINCT prefecture_code, prefecture_name FROM " + facilitiesViewFor(domain) +
+      " WHERE prefecture_name IS NOT NULL ORDER BY prefecture_code";
+    const result = await conn.query(sql);
+    prefectureCache[domain] = result.toArray().map((row) => row.prefecture_name);
+  }
+
+  prefectureCache[domain].forEach(function (prefectureName) {
+    const option = document.createElement("option");
+    option.value = prefectureName;
+    option.textContent = prefectureName;
+    filingPrefectureSelect.appendChild(option);
+  });
+}
+
+async function renderFilingCandidates(query) {
+  filingCandidates.innerHTML = "";
+  if (!query) return;
+
+  await ensureData([currentFilingDomain() === "薬局" ? "filings_ph" : "filings_med"]);
+  const escaped = escapeSqlLiteral(query);
+  const sql =
+    "SELECT DISTINCT filing_name FROM " + filingsViewFor(currentFilingDomain()) +
+    " WHERE filing_name LIKE '%" + escaped + "%' ORDER BY filing_name LIMIT 50";
+  const result = await conn.query(sql);
+  const rows = result.toArray();
+
+  const fragment = document.createDocumentFragment();
+  rows.forEach(function (row) {
+    const li = document.createElement("li");
+    li.textContent = row.filing_name;
+    li.addEventListener("click", function () {
+      selectedFilingName = row.filing_name;
+      filingSearchBox.value = row.filing_name;
+      filingCandidates.innerHTML = "";
+      selectedFilingNameEl.innerHTML =
+        "選択中の届出名称: <strong>" + row.filing_name + "</strong>";
+      runFilingReverseLookup();
+    });
+    fragment.appendChild(li);
+  });
+  filingCandidates.appendChild(fragment);
+}
+
+async function runFilingReverseLookup() {
+  if (!selectedFilingName) return;
+
+  const domain = currentFilingDomain();
+  await ensureData([domain === "薬局" ? "filings_ph" : "filings_med"]);
+  const facilitiesView = facilitiesViewFor(domain);
+  const filingsView = filingsViewFor(domain);
+  const escapedFilingName = escapeSqlLiteral(selectedFilingName);
+
+  let where = "l.filing_name = '" + escapedFilingName + "'";
+  if (filingBureauSelect.value) {
+    where += " AND f.bureau = '" + escapeSqlLiteral(filingBureauSelect.value) + "'";
+  }
+  if (filingPrefectureSelect.value) {
+    where += " AND f.prefecture_name = '" + escapeSqlLiteral(filingPrefectureSelect.value) + "'";
+  }
+
+  const sql =
+    "SELECT DISTINCT f.facility_id, f.facility_name, f.bureau, f.prefecture_name, f.address, f.domain " +
+    "FROM " + filingsView + " l " +
+    "JOIN " + facilitiesView + " f ON f.facility_id = l.facility_id " +
+    "WHERE " + where + " " +
+    "ORDER BY f.facility_name " +
+    "LIMIT " + HARD_LIMIT;
+
+  await runFacilityQuery(sql, "該当する施設が見つかりません");
+}
+
+filingSearchBox.addEventListener("input", function () {
+  selectedFilingName = null;
+  renderFilingCandidates(filingSearchBox.value.trim());
+});
+
+for (const radio of filingDomainRadios) {
+  radio.addEventListener("change", async function () {
+    selectedFilingName = null;
+    filingSearchBox.value = "";
+    filingCandidates.innerHTML = "";
+    selectedFilingNameEl.textContent = "届出名称を選択してください(候補一覧から選んでください)。";
+    resultsList.innerHTML = "";
+    resultsPager.hidden = true;
+    resultsCount.textContent = "届出名称を選択してください";
+    resetMap();
+    resetDetail();
+    await loadPrefectureOptions(currentFilingDomain());
+  });
+}
+
+filingBureauSelect.addEventListener("change", function () {
+  if (selectedFilingName) runFilingReverseLookup();
+});
+filingPrefectureSelect.addEventListener("change", function () {
+  if (selectedFilingName) runFilingReverseLookup();
+});
+
+// --- 出典一覧・データ取得日(公開ページの表示用) ---
+const KOUSEIKYOKU_BASE = "https://kouseikyoku.mhlw.go.jp/";
+const SOURCE_PAGES = [
+  ["関東信越厚生局", "保険医療機関・保険薬局の施設基準の届出受理状況及び保険外併用療養費医療機関一覧／関東信越厚生局", "kantoshinetsu/chousa/kijyun.html"],
+  ["関東信越厚生局", "施設基準等の届出受理状況(直近届出分)", "kantoshinetsu/gyomu/bu_ka/tokyo/kijun.html"],
+  ["北海道厚生局", "施設基準等の届出事項(届出受理医療機関名簿)", "hokkaido/gyomu/gyomu/hoken_kikan/todokede_juri_ichiran.html"],
+  ["北海道厚生局", "施設基準等の届出事項(「届出受理医療機関名簿」(届出項目別))", "hokkaido/gyomu/gyomu/hoken_kikan/todokede_komokubetsu.html"],
+  ["東北厚生局", "施設基準の届出等受理医療機関名簿", "tohoku/gyomu/gyomu/hoken_kikan/documents/201805koushin.html"],
+  ["東海北陸厚生局", "6．施設基準の届出受理状況(全体)", "tokaihokuriku/newpage_00349.html"],
+  ["東海北陸厚生局", "7．施設基準の届出受理状況(届出項目別)", "tokaihokuriku/newpage_00350.html"],
+  ["近畿厚生局", "保険医療機関・保険薬局の施設基準の届出受理状況及び保険外併用療養費の報告状況", "kinki/gyomu/gyomu/hoken_kikan/shitei_jokyo_00004.html"],
+  ["中国四国厚生局", "保険医療機関等・指定訪問看護事業所の届出受理状況等について", "chugokushikoku/chousaka/shisetsukijunjuri.html"],
+  ["中国四国厚生局", "届出受理医療機関名簿(主な届出項目別)について", "chugokushikoku/chousaka/shisetsukijunjuri_00002.html"],
+  ["四国厚生支局", "保険医療機関・保険薬局の管内指定状況等について", "shikoku/gyomu/gyomu/hoken_kikan/shitei/index.html"],
+  ["九州厚生局", "届出受理医療機関名簿", "kyushu/gyomu/gyomu/hoken_kikan/index_00007.html"],
+  ["九州厚生局", "届出受理医療機関名簿(届出項目別)", "kyushu/gyomu/gyomu/hoken_kikan/todokede_jiko/koumoku_betsu.html"],
+];
+const TERMS_PAGES = [
+  ["関東信越", "kantoshinetsu"], ["北海道", "hokkaido"], ["東北", "tohoku"], ["東海北陸", "tokaihokuriku"],
+  ["近畿", "kinki"], ["中国四国", "chugokushikoku"], ["四国", "shikoku"], ["九州", "kyushu"],
+];
+
+function renderSourceTable() {
+  const tbody = document.querySelector("#source-table tbody");
+  SOURCE_PAGES.forEach(function (row) {
+    const url = KOUSEIKYOKU_BASE + row[2];
+    const tr = document.createElement("tr");
+    [row[0], row[1]].forEach(function (text) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      tr.appendChild(td);
+    });
+    const td = document.createElement("td");
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = url;
+    td.appendChild(a);
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  });
+
+  const termsEl = document.getElementById("terms-links");
+  TERMS_PAGES.forEach(function (row, index) {
+    if (index > 0) termsEl.appendChild(document.createTextNode(" / "));
+    const a = document.createElement("a");
+    a.href = KOUSEIKYOKU_BASE + row[1] + "/aboutus/copyright.html";
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = row[0];
+    termsEl.appendChild(a);
+  });
+}
+
+// data_meta.json(export_data_meta.pyが研究用DBから書き出す)を読み込む。
+// 局×領域ごとに、取得日(retrieved_on)と、データセット別の現在日
+// (datasets[].as_of_date。carriedは項目別が複製された=由来の現在日)を持つ。
+// 読めない場合は、その旨だけを表示し、ページの他の機能は続ける。
+let dataMetaByBureau = null;
+
+function formatJaDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+  return m ? m[1] + "年" + Number(m[2]) + "月" + Number(m[3]) + "日" : (iso || "-");
+}
+
+function formatShortDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+  return m ? Number(m[2]) + "/" + Number(m[3]) : (iso || "-");
+}
+
+function monthsBetween(olderIso, newerIso) {
+  const a = olderIso.split("-").map(Number);
+  const b = newerIso.split("-").map(Number);
+  return (b[0] - a[0]) * 12 + (b[1] - a[1]);
+}
+
+function asofOf(bureau, domain, datasetType) {
+  const entry = dataMetaByBureau && dataMetaByBureau[bureau] && dataMetaByBureau[bureau][domain];
+  if (!entry) return null;
+  return (entry.datasets || {})[datasetType] || null;
+}
+
+// 主名簿と項目別で現在日が違う医科の局(項目別が古い)を返す。
+function asofLagList() {
+  const list = [];
+  Object.keys(BUREAU_LABELS).forEach(function (bureau) {
+    const main = asofOf(bureau, "医科", "medical_facilities");
+    const item = asofOf(bureau, "医科", "medical_itemized");
+    if (main && item && main.as_of_date !== item.as_of_date) {
+      list.push({
+        bureau: bureau,
+        main: main.as_of_date,
+        itemized: item.as_of_date,
+        months: monthsBetween(item.as_of_date, main.as_of_date),
+      });
+    }
+  });
+  return list;
+}
+
+function renderAsofSummary() {
+  const el = document.getElementById("asof-summary");
+  if (!dataMetaByBureau) return;
+  const all = [];
+  Object.keys(dataMetaByBureau).forEach(function (bureau) {
+    Object.keys(dataMetaByBureau[bureau]).forEach(function (domain) {
+      Object.values(dataMetaByBureau[bureau][domain].datasets || {}).forEach(function (d) {
+        all.push(d.as_of_date);
+      });
+    });
+  });
+  if (!all.length) return;
+  all.sort();
+  el.textContent = "";
+  const head = document.createElement("span");
+  head.textContent =
+    "データ時点(現在日): " + formatJaDate(all[0]) + "〜" + formatJaDate(all[all.length - 1]) +
+    "(局・名簿の種類により異なります。詳細は下部の表)";
+  el.appendChild(head);
+  const lag = asofLagList();
+  if (lag.length) {
+    el.appendChild(document.createElement("br"));
+    const note = document.createElement("span");
+    note.className = "asof-lag";
+    note.textContent = "主名簿と項目別で現在日が異なる局: " + lag.map(function (item) {
+      return bureauLabel(item.bureau) + " 主名簿" + formatShortDate(item.main) + "・項目別" + formatShortDate(item.itemized);
+    }).join("、");
+    el.appendChild(note);
+  }
+  el.style.display = "block";
+}
+
+// 施設の詳細に、その局・領域の現在日と取得日を出す。
+function asofTextForFacility(bureau, domain) {
+  const entry = dataMetaByBureau && dataMetaByBureau[bureau] && dataMetaByBureau[bureau][domain];
+  if (!entry) return null;
+  const parts = [];
+  const datasets = entry.datasets || {};
+  const main = datasets[domain === "医科" ? "medical_facilities" : "pharmacy_facilities"];
+  const item = datasets["medical_itemized"];
+  if (main) parts.push((domain === "医科" ? "主名簿 " : "") + formatJaDate(main.as_of_date) + "現在");
+  if (domain === "医科" && item) parts.push("項目別 " + formatJaDate(item.as_of_date) + "現在");
+  return {
+    text: "データ時点: " + parts.join(" / ") + "(取得日 " + formatJaDate(entry.retrieved_on) + ")",
+    lag: !!(main && item && main.as_of_date !== item.as_of_date),
+  };
+}
+
+async function loadDataMeta() {
+  const response = await fetch(new URL("data_meta.json", window.location.href).toString(), { cache: "no-store" });
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  const meta = await response.json();
+  const byBureau = {};
+  meta.sources.forEach(function (s) {
+    byBureau[s.bureau] = byBureau[s.bureau] || {};
+    const datasets = {};
+    (s.datasets || []).forEach(function (d) { datasets[d.dataset_type] = d; });
+    byBureau[s.bureau][s.domain] = { retrieved_on: s.retrieved_on, last_confirmed_on: s.last_confirmed_on || null, datasets: datasets };
+  });
+  dataMetaByBureau = byBureau;
+}
+
+function appendCell(tr, text, className) {
+  const td = document.createElement("td");
+  td.textContent = text;
+  if (className) td.className = className;
+  tr.appendChild(td);
+  return td;
+}
+
+async function renderDataMeta() {
+  const el = document.getElementById("data-meta");
+  try {
+    await loadDataMeta();
+    const table = document.createElement("table");
+    const head = document.createElement("tr");
+    ["局", "医科 主名簿の現在日", "医科 項目別の現在日", "薬局の現在日", "取得日(医科)", "取得日(薬局)", "最終確認日"].forEach(function (h) {
+      const th = document.createElement("th");
+      th.textContent = h;
+      head.appendChild(th);
+    });
+    table.appendChild(head);
+    Object.keys(BUREAU_LABELS).forEach(function (bureau) {
+      const tr = document.createElement("tr");
+      const main = asofOf(bureau, "医科", "medical_facilities");
+      const item = asofOf(bureau, "医科", "medical_itemized");
+      const pharm = asofOf(bureau, "薬局", "pharmacy_facilities");
+      const med = dataMetaByBureau[bureau] && dataMetaByBureau[bureau]["医科"];
+      const phm = dataMetaByBureau[bureau] && dataMetaByBureau[bureau]["薬局"];
+      appendCell(tr, BUREAU_LABELS[bureau]);
+      appendCell(tr, main ? formatJaDate(main.as_of_date) : "-");
+      const lagged = main && item && main.as_of_date !== item.as_of_date;
+      appendCell(
+        tr,
+        item
+          ? formatJaDate(item.as_of_date) +
+            (lagged ? "(主名簿より" + monthsBetween(item.as_of_date, main.as_of_date) + "か月前)" : "")
+          : "-",
+        lagged ? "asof-lag" : ""
+      );
+      appendCell(tr, pharm ? formatJaDate(pharm.as_of_date) : "-");
+      appendCell(tr, med ? formatJaDate(med.retrieved_on) : "-");
+      appendCell(tr, phm ? formatJaDate(phm.retrieved_on) : "-");
+      // 最終確認日: 毎週の確認で、公表元のファイルが前回の取得分から変わっていないと最後に確認した日(取得日とは別)
+      const confirmed = (med && med.last_confirmed_on) || (phm && phm.last_confirmed_on);
+      appendCell(tr, confirmed ? formatJaDate(confirmed) : "-");
+      table.appendChild(tr);
+    });
+    el.textContent = "";
+    el.appendChild(table);
+    renderAsofSummary();
+  } catch (error) {
+    el.innerHTML = '<span class="notice-meta-error">データの時点を読み込めませんでした。</span>';
+    console.error("data_meta.jsonの読み込みに失敗しました:", error);
+  }
+}
+
+renderSourceTable();
+renderDataMeta();
+
+init().catch(function (error) {
+  statusEl.textContent = "DuckDB-Wasmの初期化に失敗しました: " + error.message;
+  statusEl.style.color = "#c00";
+  console.error(error);
+});
+
+// ブラウザのタブ/プレビューペインが非表示になっている間、WebGL(地図)の
+// 描画が一時停止され、再表示してもキャンバスが古い状態のまま固まって
+// 見えることがある。可視状態に戻ったタイミングでresize()し直すことで、
+// 内部の状態(選択中の施設・パン&ズーム位置)は正しいままキャンバスの
+// 描画だけを追いつかせる。
+document.addEventListener("visibilitychange", function () {
+  if (!document.hidden && map) {
+    map.resize();
+  }
+});
+</script>
+
+</body>
+</html>
